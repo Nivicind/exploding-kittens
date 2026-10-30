@@ -552,15 +552,18 @@ export class GameStateManager {
       state.pendingAction.passedPlayerIds.push(playerId);
     }
 
-    // Kiểm tra xem tất cả những người chơi còn sống đang giữ lá Nope đã pass hay chưa
-    const alivePlayersWithNope = state.players.filter(
-      p => p.isAlive && p.hand.some(c => c.defId === 'nope')
+    // Kiểm tra xem tất cả những người chơi còn sống có thể đánh Nope đã pass hay chưa.
+    // Lưu ý: Khi vừa đánh bài (nopeCount === 0), người phát động không tự Nope chính mình nên không cần chờ họ pass.
+    const relevantNopeHolders = state.players.filter(
+      p => p.isAlive &&
+        (state.pendingAction!.nopeCount > 0 || p.id !== state.pendingAction!.initiatorId) &&
+        p.hand.some(c => c.defId === 'nope')
     );
 
     const allAlive = state.players.filter(p => p.isAlive);
     const allPassed = allAlive.every(p => state.pendingAction?.passedPlayerIds.includes(p.id));
-    const allNopeHoldersPassed = alivePlayersWithNope.length > 0 && 
-      alivePlayersWithNope.every(p => state.pendingAction?.passedPlayerIds.includes(p.id));
+    const allNopeHoldersPassed = relevantNopeHolders.length > 0 && 
+      relevantNopeHolders.every(p => state.pendingAction?.passedPlayerIds.includes(p.id));
 
     // Chỉ tự động giải quyết sớm nếu tất cả những người CÓ THỂ ĐÁNH NOPE đã bấm pass
     // HOẶC tất cả người chơi còn sống đều đã pass

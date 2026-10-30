@@ -110,17 +110,6 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     }
   }, [myPlayer?.hand]);
 
-  // Tự động cuộn mượt căn giữa avatar của người đang đến lượt trên mobile
-  useEffect(() => {
-    if (currentPlayer?.id && opponentRefs.current[currentPlayer.id]) {
-      opponentRefs.current[currentPlayer.id]?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'nearest',
-        inline: 'center'
-      });
-    }
-  }, [state.currentPlayerIndex, currentPlayer?.id]);
-
   // Tính xác suất Mèo Nổ
   const explodingKittensCount = state.drawPile.filter(c => c.defId === 'exploding_kitten').length;
   const dangerProb = state.drawPile.length > 0 
@@ -572,11 +561,23 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           </span>
         </div>
 
-        <div className="flex items-center gap-1.5 text-xs">
-          <span className="text-slate-400 text-[11px] hidden md:inline">Lượt:</span>
-          <span className="font-black text-yellow-400 bg-slate-800 px-2 py-0.5 rounded-lg border border-slate-700 text-[11px] sm:text-xs">
-            {currentPlayer?.name} {currentPlayer?.turnsToTake > 1 ? `(${currentPlayer.turnsToTake}L)` : ''}
-          </span>
+        <div className="flex items-center gap-2">
+          {/* Lượt hiện tại */}
+          <div className="flex items-center gap-1 text-xs">
+            <span className="text-slate-400 text-[10px] sm:text-[11px] hidden md:inline">Lượt:</span>
+            <span className="font-black text-yellow-400 bg-slate-800 px-2 py-0.5 rounded-lg border border-slate-700 text-[10px] sm:text-xs">
+              {currentPlayer?.name} {currentPlayer?.turnsToTake > 1 ? `(${currentPlayer.turnsToTake}L)` : ''}
+            </span>
+          </div>
+
+          {/* Số bài trên tay của bạn (hiển thị tiện lợi ngay trên header ở mobile để không bao giờ bị đè) */}
+          {myPlayer && (
+            <div className="flex items-center gap-1 bg-slate-800/90 border border-slate-700 px-2 py-0.5 rounded-lg text-[10px] sm:text-xs font-bold text-slate-200">
+              <span>🎴</span>
+              <span className="text-yellow-400 font-black">{myPlayer.hand.length}</span>
+              <span className="text-slate-400 hidden xs:inline">lá</span>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-1.5 text-xs">
@@ -606,81 +607,80 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       )}
 
       {/* 3. SÀN ĐẤU BÀI TẬP TRUNG (UNIFIED GAME TABLE MAT)
-          - Tích hợp đối thủ phân bố vòng cung trực tiếp trên mặt thảm nỉ của sàn chơi
-          - Hỗ trợ cuộn ngang mượt mà trên mobile và tự động căn giữa người đang đến lượt
-          - Độ cong uốn rõ nét, tự nhiên (arcY sâu hơn kèm góc xoay nghiêng hướng vào tâm)
-          - Người đến lượt tự động tách rộng khoảng cách với 2 người bên cạnh và hào quang rực rỡ
+          - Tích hợp đối thủ phân bố vòng cung nhẹ nhàng, tự nhiên
+          - Tự động co giãn theo 100% bề ngang màn hình mobile / desktop (không cuộn ngang, không hộp riêng)
+          - Người đến lượt tự động sáng hào quang rực rỡ
       */}
       <div className="flex-1 min-h-0 relative flex flex-col justify-between items-center w-full px-2 sm:px-4 py-1 overflow-visible">
-        {/* VÒNG ĐỐI THỦ PHÂN BỐ CUNG TRÒN TRÊN THẢM SÀN ĐẤU (HỖ TRỢ CUỘN VÀ TỰ ĐỘNG CĂN GIỮA TRÊN MOBILE) */}
-        <div className="w-full flex justify-start sm:justify-center items-center overflow-x-auto scrollbar-none touch-pan-x px-2 pt-1 pb-3 z-20">
-          <div className="flex justify-start sm:justify-center items-center px-4 overflow-visible min-w-full sm:min-w-0">
-            {opponents.map((opp, idx) => {
-              const isTurn = state.status === 'playing' && currentPlayer?.id === opp.id;
-              const totalOpp = opponents.length;
-              const mid = (totalOpp - 1) / 2;
-              const t = totalOpp > 1 ? (idx - mid) / mid : 0;
+        {/* VÒNG ĐỐI THỦ PHÂN BỐ CUNG TRÒN TỰ CO GIÃN THEO BỀ NGANG MÀN HÌNH (KHÔNG HỘP, KHÔNG CUỘN) */}
+        <div className="w-full max-w-4xl flex justify-center items-center gap-1 sm:gap-2 px-1 sm:px-3 pt-1 pb-2 z-20 overflow-visible">
+          {opponents.map((opp, idx) => {
+            const isTurn = state.status === 'playing' && currentPlayer?.id === opp.id;
+            const totalOpp = opponents.length;
+            const mid = (totalOpp - 1) / 2;
+            const t = totalOpp > 1 ? (idx - mid) / mid : 0;
 
-              // Uốn cong hình vòng cung rõ nét hơn (ở giữa nhô lên cao, 2 bên thoai thoải ôm trọn mặt bàn)
-              const arcY = Math.pow(Math.abs(t), 1.8) * 38;
-              const arcRotate = t * 13;
+            // Uốn cong hình vòng cung nhẹ nhàng, tự nhiên không bị sâu quá trên màn hình nhỏ
+            const arcY = Math.pow(Math.abs(t), 1.6) * (totalOpp > 4 ? 8 : 14);
+            const arcRotate = t * 6;
 
-              // Thu phóng kích thước thẻ avatar theo số lượng người chơi để tránh tràn viền trên mobile
-              const sizeClass = totalOpp > 6
-                ? 'w-16 sm:w-20 md:w-24 p-1 sm:p-1.5'
-                : totalOpp > 4
-                ? 'w-20 sm:w-24 md:w-28 p-1.5 sm:p-2'
-                : 'w-24 sm:w-28 md:w-32 p-2';
+            // Tự co giãn theo tỉ lệ bề ngang màn hình:
+            const maxWClass = totalOpp <= 2
+              ? 'max-w-[120px]'
+              : totalOpp <= 4
+              ? 'max-w-[90px]'
+              : totalOpp <= 6
+              ? 'max-w-[68px]'
+              : 'max-w-[50px]';
 
-              return (
-                <div
-                  key={opp.id}
-                  ref={el => (opponentRefs.current[opp.id] = el)}
-                  style={{
-                    transform: `translateY(${arcY}px) rotate(${arcRotate}deg)`
-                  }}
-                  className={`relative flex-shrink-0 rounded-2xl flex flex-col items-center justify-between border-2 transition-all duration-300 origin-center ${sizeClass} ${
-                    isTurn ? 'mx-2.5 sm:mx-5 scale-110 z-30' : 'mx-1 sm:mx-1.5'
-                  } ${
-                    !opp.isAlive
-                      ? 'bg-rose-950/20 border-rose-900/40 opacity-40 grayscale'
-                      : isTurn
-                      ? 'bg-yellow-950/70 border-yellow-400 shadow-[0_0_25px_rgba(250,204,21,0.5)] ring-4 ring-yellow-400'
-                      : 'bg-slate-900/80 border-slate-800/80 hover:border-slate-700 backdrop-blur-sm'
-                  }`}
-                >
-                  {/* Avatar đối thủ */}
-                  <div className={`relative text-xl sm:text-3xl transition-transform ${isTurn ? 'scale-110' : ''}`}>
-                    {opp.isAlive ? (opp.isBot ? '🐱' : '👤') : '💀'}
-                    {isTurn && (
-                      <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-3 w-3 bg-yellow-500"></span>
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="text-center w-full">
-                    <div className="text-[9px] sm:text-[11px] font-black truncate text-slate-100">{opp.name}</div>
-                    <div className="text-[8px] sm:text-[9px] text-slate-400 font-bold">
-                      {opp.isAlive ? `🎴 ${opp.hand.length} lá` : 'ĐÃ NỔ 💥'}
-                    </div>
-                  </div>
-
-                  {/* Trạng thái lượt đi hoặc mất mạng */}
-                  {opp.disconnected && opp.isAlive ? (
-                    <span className="text-[7px] sm:text-[7.5px] uppercase font-black px-1.5 py-0.2 rounded-full bg-rose-600/90 text-white animate-pulse flex items-center gap-0.5">
-                      <span>📶</span> AI chơi hộ
+            return (
+              <div
+                key={opp.id}
+                ref={el => (opponentRefs.current[opp.id] = el)}
+                style={{
+                  transform: `translateY(${arcY}px) rotate(${arcRotate}deg)`
+                }}
+                className={`flex-1 min-w-0 ${maxWClass} rounded-xl sm:rounded-2xl flex flex-col items-center justify-between border transition-all duration-300 origin-center py-1 sm:py-2 px-0.5 sm:px-1.5 ${
+                  isTurn
+                    ? 'scale-105 sm:scale-110 z-30 ring-2 sm:ring-4 ring-yellow-400 shadow-[0_0_20px_rgba(250,204,21,0.6)] bg-yellow-950/70 border-yellow-400'
+                    : 'bg-slate-900/80 border-slate-800/80 hover:border-slate-700 backdrop-blur-sm'
+                } ${
+                  !opp.isAlive ? 'bg-rose-950/20 border-rose-900/40 opacity-40 grayscale' : ''
+                }`}
+              >
+                {/* Avatar đối thủ */}
+                <div className={`relative text-base sm:text-2xl md:text-3xl transition-transform ${isTurn ? 'scale-110' : ''}`}>
+                  {opp.isAlive ? (opp.isBot ? '🐱' : '👤') : '💀'}
+                  {isTurn && (
+                    <span className="absolute -top-1 -right-1 flex h-2 sm:h-2.5 w-2 sm:w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-full w-full bg-yellow-500"></span>
                     </span>
-                  ) : isTurn ? (
-                    <span className="text-[7px] sm:text-[8px] uppercase font-black px-1.5 py-0.2 rounded-full bg-yellow-400 text-slate-950 shadow-sm animate-pulse">
-                      Đang đi {opp.turnsToTake > 1 ? `(${opp.turnsToTake}L)` : ''}
-                    </span>
-                  ) : null}
+                  )}
                 </div>
-              );
-            })}
-          </div>
+
+                <div className="text-center w-full min-w-0 px-0.5">
+                  <div className="text-[8px] sm:text-[10px] md:text-[11px] font-black truncate text-slate-100 max-w-full">
+                    {opp.name}
+                  </div>
+                  <div className="text-[7px] sm:text-[9px] text-slate-400 font-bold whitespace-nowrap">
+                    {opp.isAlive ? `🎴 ${opp.hand.length} lá` : 'NỔ 💥'}
+                  </div>
+                </div>
+
+                {/* Trạng thái lượt đi hoặc mất mạng */}
+                {opp.disconnected && opp.isAlive ? (
+                  <span className="text-[6px] sm:text-[7.5px] uppercase font-black px-1 py-0.2 rounded-full bg-rose-600/90 text-white animate-pulse flex items-center gap-0.5 whitespace-nowrap truncate max-w-full">
+                    <span>📶</span> AI
+                  </span>
+                ) : isTurn ? (
+                  <span className="text-[6px] sm:text-[7.5px] uppercase font-black px-1 py-0.2 rounded-full bg-yellow-400 text-slate-950 shadow-sm animate-pulse whitespace-nowrap truncate max-w-full">
+                    Đi {opp.turnsToTake > 1 ? `(${opp.turnsToTake}L)` : ''}
+                  </span>
+                ) : null}
+              </div>
+            );
+          })}
         </div>
 
         {/* BÀN CHƠI TRUNG TÂM (CENTER TABLE: TRỒNG BÀI ĐÁNH & BÀI BỐC) */}
@@ -783,8 +783,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
       {/* 6. BÀN TAY NGƯỜI CHƠI / HIỂN THỊ THUA CUỘC (HOÀN TOÀN KHÔNG DÙNG KHUNG KHÓA RIÊNG, NẰM LIỀN TRÊN MẶT SÀN) */}
       <div className="h-64 sm:h-72 md:h-80 flex-shrink-0 w-full z-20 flex flex-col justify-end overflow-visible relative">
-        {/* Thanh tiêu đề nổi nhẹ không có viền ngăn cách */}
-        <div className="flex justify-between items-center px-4 sm:px-8 z-30 pointer-events-none mb-1">
+        {/* Thanh tiêu đề nổi nhẹ chỉ hiển thị trên màn hình lớn (trên mobile đã có ở header rất gọn) */}
+        <div className="hidden sm:flex justify-between items-center px-4 sm:px-8 z-30 pointer-events-none mb-1">
           <div className="flex items-center gap-1.5 bg-slate-900/70 border border-slate-700/50 px-3 py-1 rounded-full backdrop-blur-md shadow-md">
             <span className="text-xs">🎴</span>
             <span className="text-[10px] sm:text-[11px] font-bold text-slate-200">
@@ -792,14 +792,6 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               <strong className="text-yellow-400 font-black">{myPlayer?.hand.length || 0} lá</strong>
             </span>
           </div>
-          {myPlayer?.isAlive && isMyTurn && (
-            <div className="bg-emerald-950/80 border border-emerald-400/60 px-3.5 py-1 rounded-full backdrop-blur-md shadow-lg shadow-emerald-500/20 animate-pulse flex items-center gap-1.5">
-              <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-              <span className="text-[10px] sm:text-[11px] font-black text-emerald-300 uppercase tracking-wide">
-                ĐẾN LƯỢT BẠN (ĐÁNH BÀI HOẶC RÚT)
-              </span>
-            </div>
-          )}
         </div>
 
         {/* NẾU ĐÃ THUA (CHẾT DO NỔ BOM): HIỆN CHỮ BÁO ĐÃ THUA VÀ CHUYỂN SANG KHÁN GIẢ */}

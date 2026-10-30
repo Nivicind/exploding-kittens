@@ -147,9 +147,9 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
     <div className="flex flex-col items-center w-full relative h-full justify-end overflow-visible">
       {/* 1. THÔNG BÁO BỊ CƯỚP BÀI / BỊ TẤN CÔNG (HIỂN THỊ NỔI PHÍA TRÊN BÀN TAY) */}
       {stolenNotification && !isGiveFavorMode && (
-        <div className="absolute -top-14 z-50 flex items-center gap-2 bg-rose-950/95 border-2 border-rose-500 px-4 py-2 rounded-2xl shadow-2xl backdrop-blur-md animate-fade-in">
-          <span className="text-base animate-bounce">🦹‍♂️</span>
-          <span className="text-xs font-black text-rose-200">
+        <div className="absolute -top-12 sm:-top-14 z-50 flex items-center gap-2 bg-rose-950/95 border-2 border-rose-500 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl shadow-2xl backdrop-blur-md animate-fade-in max-w-[90vw]">
+          <span className="text-sm sm:text-base animate-bounce">🦹‍♂️</span>
+          <span className="text-[11px] sm:text-xs font-black text-rose-200 truncate">
             {stolenNotification}
           </span>
         </div>
@@ -157,16 +157,16 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
 
       {/* Thông báo lượt đi & số lá bài phải bốc (luôn hiển thị rõ ràng khi đến lượt) */}
       {isMyTurn && !stolenNotification && !isGiveFavorMode && count === 0 && (
-        <div className={`absolute -top-14 z-40 px-4 py-1.5 rounded-full shadow-2xl backdrop-blur-md flex items-center gap-2 animate-pulse ${
+        <div className={`absolute -top-12 sm:-top-14 z-40 px-3 sm:px-4 py-1 sm:py-1.5 rounded-full shadow-2xl backdrop-blur-md flex items-center gap-1.5 sm:gap-2 animate-pulse max-w-[92vw] ${
           player.turnsToTake > 1
             ? 'bg-amber-950/95 border-2 border-amber-400/90'
             : 'bg-emerald-950/95 border-2 border-emerald-400/90'
         }`}>
-          <span className="text-base">{player.turnsToTake > 1 ? '⚔️' : '👉'}</span>
-          <span className={`text-xs font-black ${player.turnsToTake > 1 ? 'text-amber-300' : 'text-emerald-300'}`}>
+          <span className="text-sm sm:text-base">{player.turnsToTake > 1 ? '⚔️' : '👉'}</span>
+          <span className={`text-[10px] sm:text-xs font-black truncate ${player.turnsToTake > 1 ? 'text-amber-300' : 'text-emerald-300'}`}>
             {player.turnsToTake > 1
-              ? `ĐẾN LƯỢT BẠN (ĐANG BỊ TẤN CÔNG)! Bạn phải bốc ${player.turnsToTake} lá bài (hoặc đánh bài để né)`
-              : 'ĐẾN LƯỢT BẠN! Bạn phải bốc 1 lá bài (hoặc đánh bài trước khi bốc)'}
+              ? `Đang bị tấn công! Phải bốc ${player.turnsToTake} lá (hoặc đánh bài)`
+              : 'Đến lượt bạn! Bốc 1 lá (hoặc đánh bài)'}
           </span>
         </div>
       )}
@@ -272,7 +272,7 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
 
       {/* DANH SÁCH LÁ BÀI XÒE QUẠT SO LE & HOVER TÁCH BÀI (HỖ TRỢ CẢ MOBILE VÀ PC - KHÔNG BỊ CẮT ĐỨT) */}
       <div className={`w-full overflow-x-auto sm:overflow-visible overflow-y-visible pt-16 sm:pt-20 pb-3 px-8 flex justify-start sm:justify-center items-end ${overlapClass} touch-pan-x`}>
-        <AnimatePresence>
+        <AnimatePresence initial={false}>
           {player.hand.map((card, idx) => {
             const isSelected = selectedUids.includes(card.uid);
             const isNopeCard = card.defId === 'nope';
@@ -299,27 +299,28 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
               <motion.div
                 key={card.uid}
                 layout
-                initial={{ opacity: 0, scale: 0.8, y: 30 }}
-                exit={{
-                  y: -90,
-                  opacity: 0,
-                  scale: 0.85,
-                  rotate: 6,
-                  filter: 'brightness(1.5)',
-                  transition: { duration: 0.8, ease: 'easeOut' }
-                }}
-                onMouseEnter={() => {
-                  setHoveredIndex(idx);
-                  sound.playCardPlay();
-                }}
-                onMouseLeave={() => setHoveredIndex(null)}
+                initial={{ opacity: 0, scale: 0.8, y: 20 }}
                 animate={{
+                  opacity: 1,
                   rotate: isHovered || isSelected ? 0 : naturalRotate,
                   y: isSelected ? -26 : isHovered ? -36 : naturalY,
                   x: isHovered ? 0 : shiftX,
                   scale: isHovered ? 1.15 : isSelected ? 1.08 : 1,
                   zIndex: isHovered ? 70 : isSelected ? 50 : idx + 10
                 }}
+                exit={{
+                  y: -90,
+                  opacity: 0,
+                  scale: 0.85,
+                  rotate: 6,
+                  filter: 'brightness(1.5)',
+                  transition: { duration: 0.6, ease: 'easeOut' }
+                }}
+                onMouseEnter={() => {
+                  setHoveredIndex(idx);
+                  sound.playCardPlay();
+                }}
+                onMouseLeave={() => setHoveredIndex(null)}
                 transition={{
                   type: 'spring',
                   stiffness: 450,
