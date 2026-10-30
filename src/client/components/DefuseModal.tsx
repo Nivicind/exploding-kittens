@@ -18,6 +18,7 @@ export const DefuseModal: React.FC<DefuseModalProps> = ({
   onConfirm
 }) => {
   const [selectedIndex, setSelectedIndex] = useState<number>(0);
+  const [isRandomSecret, setIsRandomSecret] = useState<boolean>(false);
 
   // Tính toán người đi kế tiếp để người chơi dễ lên chiến thuật ám sát hoặc né bom
   const alivePlayers = players.filter(p => p.isAlive);
@@ -31,7 +32,13 @@ export const DefuseModal: React.FC<DefuseModalProps> = ({
 
   const handleConfirm = () => {
     sound.playDefuse();
-    onConfirm(selectedIndex);
+    if (isRandomSecret) {
+      // Chọn 1 vị trí ngẫu nhiên mà bản thân người chơi cũng hoàn toàn không biết trước
+      const finalRandomIndex = Math.floor(Math.random() * (drawPileCount + 1));
+      onConfirm(finalRandomIndex);
+    } else {
+      onConfirm(selectedIndex);
+    }
   };
 
   return (
@@ -72,9 +79,12 @@ export const DefuseModal: React.FC<DefuseModalProps> = ({
         <div className="grid grid-cols-2 gap-2.5 text-xs font-bold text-left">
           <button
             type="button"
-            onClick={() => setSelectedIndex(0)}
-            className={`p-3 rounded-xl border-2 transition ${
-              selectedIndex === 0
+            onClick={() => {
+              setIsRandomSecret(false);
+              setSelectedIndex(0);
+            }}
+            className={`p-3 rounded-xl border-2 transition cursor-pointer ${
+              !isRandomSecret && selectedIndex === 0
                 ? 'bg-rose-600/30 border-rose-500 text-rose-300 ring-2 ring-rose-500'
                 : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:border-slate-500'
             }`}
@@ -87,10 +97,13 @@ export const DefuseModal: React.FC<DefuseModalProps> = ({
 
           <button
             type="button"
-            onClick={() => setSelectedIndex(1)}
+            onClick={() => {
+              setIsRandomSecret(false);
+              setSelectedIndex(1);
+            }}
             disabled={drawPileCount < 1}
-            className={`p-3 rounded-xl border-2 transition ${
-              selectedIndex === 1
+            className={`p-3 rounded-xl border-2 transition cursor-pointer ${
+              !isRandomSecret && selectedIndex === 1
                 ? 'bg-emerald-600/30 border-emerald-500 text-emerald-300 ring-2 ring-emerald-500'
                 : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:border-slate-500'
             }`}
@@ -103,9 +116,12 @@ export const DefuseModal: React.FC<DefuseModalProps> = ({
 
           <button
             type="button"
-            onClick={() => setSelectedIndex(drawPileCount)}
-            className={`p-3 rounded-xl border-2 transition ${
-              selectedIndex === drawPileCount
+            onClick={() => {
+              setIsRandomSecret(false);
+              setSelectedIndex(drawPileCount);
+            }}
+            className={`p-3 rounded-xl border-2 transition cursor-pointer ${
+              !isRandomSecret && selectedIndex === drawPileCount
                 ? 'bg-emerald-600/30 border-emerald-500 text-emerald-300 ring-2 ring-emerald-500'
                 : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:border-slate-500'
             }`}
@@ -118,12 +134,16 @@ export const DefuseModal: React.FC<DefuseModalProps> = ({
 
           <button
             type="button"
-            onClick={() => setSelectedIndex(Math.floor(Math.random() * (drawPileCount + 1)))}
-            className="p-3 rounded-xl border-2 bg-slate-800/80 border-slate-700 text-slate-300 hover:border-slate-500 transition"
+            onClick={() => setIsRandomSecret(true)}
+            className={`p-3 rounded-xl border-2 transition cursor-pointer ${
+              isRandomSecret
+                ? 'bg-amber-600/30 border-amber-400 text-amber-300 ring-2 ring-amber-400 shadow-lg shadow-amber-500/20'
+                : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:border-slate-500'
+            }`}
           >
-            <div className="text-base mb-1">🎲 Vị trí ngẫu nhiên</div>
-            <div className="text-[10px] text-slate-400 font-normal leading-tight">
-              Tùy duyên số trời xắp đặt
+            <div className="text-base mb-1">🎲 Ngẫu nhiên (Bí mật 100%)</div>
+            <div className="text-[10px] text-amber-300/90 font-normal leading-tight">
+              {isRandomSecret ? '✓ Đang chọn bí mật (Bạn cũng không biết)' : 'Tùy duyên, bạn cũng không biết nằm ở đâu'}
             </div>
           </button>
         </div>
@@ -131,23 +151,42 @@ export const DefuseModal: React.FC<DefuseModalProps> = ({
         {/* Thanh trượt tùy chỉnh vị trí chính xác */}
         <div className="bg-slate-950/90 p-3.5 rounded-2xl border border-slate-800">
           <div className="flex justify-between items-center text-xs font-bold mb-1.5">
-            <span className="text-slate-400">Vị trí chính xác trong xấp:</span>
-            <span className="text-emerald-400 font-mono font-black text-sm">
-              {selectedIndex === 0 ? 'Đỉnh xấp (0)' : selectedIndex === drawPileCount ? `Đáy xấp (${drawPileCount})` : `Lá thứ ${selectedIndex + 1}`}
+            <span className="text-slate-400">Vị trí giấu bom trong xấp:</span>
+            <span className={`font-mono font-black text-sm ${isRandomSecret ? 'text-amber-400 animate-pulse' : 'text-emerald-400'}`}>
+              {isRandomSecret
+                ? '❓ Vị trí bí mật (Bạn cũng không biết!)'
+                : selectedIndex === 0
+                ? 'Đỉnh xấp (0)'
+                : selectedIndex === drawPileCount
+                ? `Đáy xấp (${drawPileCount})`
+                : `Lá thứ ${selectedIndex + 1}`}
             </span>
           </div>
-          <input
-            type="range"
-            min="0"
-            max={drawPileCount}
-            value={selectedIndex}
-            onChange={e => setSelectedIndex(parseInt(e.target.value))}
-            className="w-full accent-emerald-500 cursor-pointer"
-          />
-          <div className="flex justify-between text-[9px] text-slate-500 mt-0.5">
-            <span>Đỉnh bài (0)</span>
-            <span>Đáy bài ({drawPileCount})</span>
-          </div>
+
+          {isRandomSecret ? (
+            <div className="py-2.5 px-3 rounded-xl bg-amber-950/40 border border-amber-500/40 text-amber-200 text-[11px] text-left flex items-center gap-2">
+              <span className="text-base">🎲</span>
+              <span>Quả bom sẽ được nhét ngẫu nhiên vào 1 vị trí bất kỳ trong {drawPileCount + 1} lá. Cả bạn và đối thủ đều không biết trước!</span>
+            </div>
+          ) : (
+            <>
+              <input
+                type="range"
+                min="0"
+                max={drawPileCount}
+                value={selectedIndex}
+                onChange={e => {
+                  setIsRandomSecret(false);
+                  setSelectedIndex(parseInt(e.target.value));
+                }}
+                className="w-full accent-emerald-500 cursor-pointer"
+              />
+              <div className="flex justify-between text-[9px] text-slate-500 mt-0.5">
+                <span>Đỉnh bài (0)</span>
+                <span>Đáy bài ({drawPileCount})</span>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Nút xác nhận */}

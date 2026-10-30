@@ -159,6 +159,12 @@ export const App: React.FC = () => {
     socket.emit('add_bot', { roomId });
   };
 
+  // Bớt / Xóa AI bot khỏi phòng
+  const handleRemoveBot = (botId?: string) => {
+    if (!socket || !roomId) return;
+    socket.emit('remove_bot', { roomId, botId });
+  };
+
   // Bắt đầu ván đấu
   const handleStartGame = () => {
     if (!socket || !roomId) return;
@@ -316,6 +322,7 @@ export const App: React.FC = () => {
           onCreateMultiplayer={handleCreateMultiplayer}
           onJoinMultiplayer={handleJoinMultiplayer}
           onAddBot={handleAddBot}
+          onRemoveBot={handleRemoveBot}
           onStartGame={handleStartGame}
           onUpdateDeckConfig={handleUpdateDeckConfig}
           onUpdateSettings={handleUpdateSettings}

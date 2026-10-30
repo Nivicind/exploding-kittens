@@ -116,6 +116,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   // Modal hướng dẫn luật chơi
   const [showRulesModal, setShowRulesModal] = useState<boolean>(false);
 
+  // Thông báo nổi hệ thống (Mất kết nối mạng, AI chơi hộ, kết nối lại)
+  const [systemAlert, setSystemAlert] = useState<{ icon: string; message: string; color: string } | null>(null);
+
   // Theo dõi log và index lượt trước đó
   const lastLogIdRef = useRef<string | null>(null);
   const prevPlayerIndexRef = useRef<number>(state.currentPlayerIndex);
@@ -272,6 +275,30 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       setIsShufflingDrawPile(true);
       sound.playShuffle();
       setTimeout(() => setIsShufflingDrawPile(false), 1600);
+    }
+
+    // 2.1. Phát hiện sự kiện người chơi mất kết nối, kết nối lại hoặc rời trận
+    if (latestLog.message.includes('mất kết nối') || latestLog.message.includes('disconnected')) {
+      setSystemAlert({
+        icon: '📶',
+        message: latestLog.message,
+        color: 'border-rose-500 bg-rose-950/95 text-rose-200'
+      });
+      setTimeout(() => setSystemAlert(null), 5000);
+    } else if (latestLog.message.includes('kết nối lại')) {
+      setSystemAlert({
+        icon: '✅',
+        message: latestLog.message,
+        color: 'border-emerald-500 bg-emerald-950/95 text-emerald-200'
+      });
+      setTimeout(() => setSystemAlert(null), 4000);
+    } else if (latestLog.message.includes('đã rời bàn đấu')) {
+      setSystemAlert({
+        icon: '👋',
+        message: latestLog.message,
+        color: 'border-indigo-500 bg-indigo-950/95 text-indigo-200'
+      });
+      setTimeout(() => setSystemAlert(null), 5000);
     }
 
     // 3. Nếu chính mình hoặc người chơi bị cướp bài (Combo 2, Combo 3, Favor)
@@ -716,6 +743,16 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         </div>
       </div>
 
+      {/* THÔNG BÁO HỆ THỐNG NỔI (MẤT KẾT NỐI MẠNG, KẾT NỐI LẠI, BOT TIẾP QUẢN) */}
+      {systemAlert && (
+        <div className="absolute top-13 sm:top-14 inset-x-0 mx-auto z-50 flex items-center justify-center pointer-events-none px-4 animate-fade-in">
+          <div className={`px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-2xl border-2 shadow-2xl backdrop-blur-md flex items-center gap-2 max-w-sm sm:max-w-md ${systemAlert.color}`}>
+            <span className="text-sm sm:text-base animate-pulse">{systemAlert.icon}</span>
+            <span className="text-[11px] sm:text-xs font-black truncate">{systemAlert.message}</span>
+          </div>
+        </div>
+      )}
+
       {/* 2. Banner Thông Báo Hành Động Đang Chờ NOPE (Cố định góc phải, không layout shift) */}
       {state.pendingAction?.type === 'NOPE_WINDOW' && myPlayer && (
         <ActionBanner
@@ -764,17 +801,33 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                     ? 'ring-4 ring-rose-500 shadow-[0_0_35px_rgba(244,63,94,1)] bg-rose-950 border-rose-400 animate-bounce-short'
                     : isTurn
                     ? 'ring-2 sm:ring-4 ring-yellow-400 shadow-[0_0_20px_rgba(250,204,21,0.6)] bg-yellow-950/70 border-yellow-400'
+                    : opp.disconnected && opp.isAlive
+                    ? 'ring-2 ring-rose-500/80 bg-rose-950/40 border-rose-500/60 shadow-lg'
                     : 'bg-slate-900/80 border-slate-800/80 hover:border-slate-700 backdrop-blur-sm'
                 } ${
                   !opp.isAlive ? 'bg-rose-950/20 border-rose-900/40 opacity-40 grayscale' : ''
                 }`}
               >
-                {/* Avatar đối thủ */}
+                {/* Avatar đối thủ (Tự động thay bằng Robot nếu mất kết nối hoặc Bot tiếp quản) */}
                 <div className={`relative text-base sm:text-2xl md:text-3xl transition-transform ${isDefusing ? 'scale-125' : isTurn ? 'scale-110' : ''}`}>
-                  {isDefusing ? '🙀' : opp.isAlive ? (opp.isBot ? '🐱' : '👤') : '💀'}
+                  {isDefusing 
+                    ? '🙀' 
+                    : !opp.isAlive 
+                    ? '💀' 
+                    : opp.disconnected 
+                    ? '🤖' 
+                    : opp.isBot 
+                    ? (opp.name.includes('(Bot)') ? '🤖' : '🐱') 
+                    : '👤'}
+
                   {isDefusing ? (
                     <span className="absolute -top-2 -right-2 text-sm sm:text-base animate-ping">
                       💥
+                    </span>
+                  ) : opp.disconnected && opp.isAlive ? (
+                    <span className="absolute -top-1 -right-1 flex h-2.5 sm:h-3 w-2.5 sm:w-3" title={lang === 'en' ? 'Disconnected - AI playing' : 'Mất kết nối - Bot đang chơi hộ'}>
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-80"></span>
+                      <span className="relative inline-flex rounded-full h-full w-full bg-rose-600 border border-white/50 text-[7px] text-white items-center justify-center font-bold">!</span>
                     </span>
                   ) : isTurn ? (
                     <span className="absolute -top-1 -right-1 flex h-2 sm:h-2.5 w-2 sm:w-2.5">
@@ -797,14 +850,24 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                   </div>
                 </div>
 
-                {/* Trạng thái lượt đi, rút bom hoặc mất mạng */}
+                {/* Trạng thái lượt đi, rút bom, mất kết nối có animation ba chấm hoặc bot chơi hộ */}
                 {isDefusing ? (
                   <span className="text-[6px] sm:text-[7.5px] uppercase font-black px-1.5 py-0.5 rounded-full bg-rose-600 text-white shadow-lg animate-pulse whitespace-nowrap truncate max-w-full flex items-center justify-center gap-0.5 border border-rose-300 my-0.5">
                     <span>💣</span> {t('bombTag')}
                   </span>
                 ) : opp.disconnected && opp.isAlive ? (
-                  <span className="text-[6px] sm:text-[7.5px] uppercase font-black px-1.5 py-0.5 rounded-full bg-rose-600/90 text-white animate-pulse flex items-center gap-0.5 whitespace-nowrap truncate max-w-full my-0.5">
-                    <span>📶</span> {t('aiTag')}
+                  <div className="flex items-center justify-center gap-0.5 px-1 sm:px-1.5 py-0.5 rounded-full bg-rose-950/90 border border-rose-500/70 text-rose-300 text-[6px] sm:text-[7.5px] font-black animate-pulse whitespace-nowrap truncate max-w-full my-0.5">
+                    <span>📶</span>
+                    <span>{isTurn ? (lang === 'en' ? 'AI Playing' : 'Bot đi hộ') : (lang === 'en' ? 'Waiting' : 'Chờ vào lại')}</span>
+                    <span className="inline-flex font-mono">
+                      <span className="animate-bounce" style={{ animationDelay: '0ms' }}>.</span>
+                      <span className="animate-bounce" style={{ animationDelay: '150ms' }}>.</span>
+                      <span className="animate-bounce" style={{ animationDelay: '300ms' }}>.</span>
+                    </span>
+                  </div>
+                ) : opp.isBot && opp.name.includes('(Bot)') ? (
+                  <span className="text-[6px] sm:text-[7.5px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-950/80 border border-indigo-500/50 text-indigo-300 flex items-center justify-center gap-0.5 whitespace-nowrap truncate max-w-full my-0.5">
+                    <span>🤖</span> {lang === 'en' ? 'Bot' : 'Bot chơi hộ'}
                   </span>
                 ) : isTurn ? (
                   <span className="text-[6px] sm:text-[7.5px] uppercase font-black px-1.5 py-0.5 rounded-full bg-yellow-400 text-slate-950 shadow-sm animate-pulse whitespace-nowrap truncate max-w-full my-0.5">

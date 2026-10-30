@@ -149,6 +149,27 @@ export class RoomManager {
     return { room };
   }
 
+  removeBotFromRoom(roomId: string, botId?: string): { room?: Room; error?: string } {
+    const room = this.getRoom(roomId);
+    if (!room) return { error: 'Không tìm thấy phòng.' };
+    if (room.state && room.state.status === 'playing') return { error: 'Trận đấu đang diễn ra.' };
+
+    const botCount = room.players.filter(p => p.isBot).length;
+    if (botCount === 0) return { error: 'Trong phòng không có Bot AI nào.' };
+
+    if (botId) {
+      room.players = room.players.filter(p => p.id !== botId);
+    } else {
+      const lastBotIdx = room.players.map(p => p.isBot).lastIndexOf(true);
+      if (lastBotIdx !== -1) {
+        room.players.splice(lastBotIdx, 1);
+      }
+    }
+
+    this.broadcastRoom(room);
+    return { room };
+  }
+
   /**
    * Đồng bộ trạng thái mất kết nối giữa RoomPlayer và PlayerState
    */
@@ -297,6 +318,14 @@ export class RoomManager {
     if (room.players.length < 2) return { success: false, error: 'Cần ít nhất 2 người chơi hoặc thêm AI Bot để bắt đầu.' };
 
     try {
+      // Xáo trộn ngẫu nhiên vị trí ngồi / lượt chơi của mọi người chơi trước khi bắt đầu trận
+      const shuffledPlayers = [...room.players];
+      for (let i = shuffledPlayers.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffledPlayers[i], shuffledPlayers[j]] = [shuffledPlayers[j], shuffledPlayers[i]];
+      }
+      room.players = shuffledPlayers;
+
       room.state = GameStateManager.createGame(
         room.players.map(p => ({ id: p.id, name: p.name, isBot: p.isBot })),
         room.deckConfig,

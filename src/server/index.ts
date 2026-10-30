@@ -112,6 +112,12 @@ io.on('connection', socket => {
     if (callback) callback(res);
   });
 
+  // Bớt / Xóa AI bot khỏi phòng
+  socket.on('remove_bot', ({ roomId, botId }, callback) => {
+    const res = roomManager.removeBotFromRoom(roomId, botId);
+    if (callback) callback(res);
+  });
+
   // Bắt đầu trận đấu
   socket.on('start_game', ({ roomId }, callback) => {
     const res = roomManager.startGame(roomId);

@@ -351,7 +351,7 @@ describe('Kiểm tra Vòng lượt và Hành động lá bài', () => {
     const room = roomManager.createRoom('Host', 'socket_1', 1);
     roomManager.startGame(room.id);
 
-    const player = room.players[0];
+    const player = room.players.find(p => !p.isBot)!;
     expect(player.disconnected).toBeFalsy();
 
     // Giả lập socket_1 mất kết nối mạng
@@ -377,7 +377,7 @@ describe('Kiểm tra Vòng lượt và Hành động lá bài', () => {
     const room = roomManager.createRoom('Host', 'socket_1', 1);
     roomManager.startGame(room.id);
 
-    const player = room.players[0];
+    const player = room.players.find(p => !p.isBot)!;
     expect(player.isBot).toBe(false);
 
     // Người chơi chủ động rời bàn
@@ -388,6 +388,27 @@ describe('Kiểm tra Vòng lượt và Hành động lá bài', () => {
     expect(player.isBot).toBe(true);
     expect(player.name).toContain('(Bot)');
     expect(room.state?.players.find(p => p.id === player.id)?.isBot).toBe(true);
+  });
+
+  it('RoomManager: Có thể thêm và bớt / xóa Bot AI trong phòng chờ', () => {
+    const mockIo = {
+      to: () => ({ emit: () => {} }),
+      emit: () => {}
+    } as any;
+    const roomManager = new RoomManager(mockIo);
+    const room = roomManager.createRoom('Host', 'socket_1', 0); // 1 người, 0 bot
+    expect(room.players.length).toBe(1);
+
+    // Thêm bot
+    const addRes = roomManager.addBotToRoom(room.id);
+    expect(addRes.room?.players.length).toBe(2);
+    const addedBot = addRes.room?.players.find(p => p.isBot)!;
+    expect(addedBot).toBeDefined();
+
+    // Bớt bot theo ID cụ thể
+    const removeRes = roomManager.removeBotFromRoom(room.id, addedBot.id);
+    expect(removeRes.room?.players.length).toBe(1);
+    expect(removeRes.room?.players.some(p => p.isBot)).toBe(false);
   });
 });
 

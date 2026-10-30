@@ -38,6 +38,7 @@ interface LobbyProps {
   onCreateMultiplayer: (hostName: string, deckConfig?: CustomDeckConfig, settings?: GameSettings) => void;
   onJoinMultiplayer: (roomId: string, playerName: string) => void;
   onAddBot: () => void;
+  onRemoveBot?: (botId?: string) => void;
   onStartGame: () => void;
   onUpdateDeckConfig: (config: CustomDeckConfig) => void;
   onUpdateSettings?: (settings: GameSettings) => void;
@@ -54,6 +55,7 @@ export const Lobby: React.FC<LobbyProps> = ({
   onCreateMultiplayer,
   onJoinMultiplayer,
   onAddBot,
+  onRemoveBot,
   onStartGame,
   onUpdateDeckConfig,
   onUpdateSettings,
@@ -230,13 +232,30 @@ export const Lobby: React.FC<LobbyProps> = ({
           <div className="space-y-2">
             <div className="flex justify-between items-center text-xs font-bold text-slate-400">
               <span>{lang === 'en' ? 'Players ready' : 'Người chơi đã sẵn sàng'} ({room.players.length}/10):</span>
-              {isHost && room.players.length < 10 && (
-                <button
-                  onClick={onAddBot}
-                  className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-yellow-300 rounded-lg border border-slate-700 transition"
-                >
-                  {lang === 'en' ? '+ Add AI Bot' : '+ Thêm Bot AI'}
-                </button>
+              {isHost && (
+                <div className="flex items-center gap-1.5">
+                  {room.players.some(p => p.isBot) && onRemoveBot && (
+                    <button
+                      type="button"
+                      onClick={() => onRemoveBot()}
+                      className="px-2.5 py-1 bg-rose-950/70 hover:bg-rose-900/80 text-rose-300 rounded-lg border border-rose-800/80 transition text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                      title={lang === 'en' ? 'Remove last AI bot' : 'Bớt 1 bot AI khỏi phòng'}
+                    >
+                      <span>➖</span>
+                      <span>{lang === 'en' ? 'Remove Bot' : 'Bớt Bot'}</span>
+                    </button>
+                  )}
+                  {room.players.length < 10 && (
+                    <button
+                      type="button"
+                      onClick={onAddBot}
+                      className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-yellow-300 rounded-lg border border-slate-700 transition text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                    >
+                      <span>➕</span>
+                      <span>{lang === 'en' ? 'Add Bot' : 'Thêm Bot'}</span>
+                    </button>
+                  )}
+                </div>
               )}
             </div>
 
@@ -244,23 +263,40 @@ export const Lobby: React.FC<LobbyProps> = ({
               {room.players.map((p, idx) => (
                 <div
                   key={p.id}
-                  className={`p-3 rounded-xl border flex items-center gap-2.5 ${
+                  className={`p-3 rounded-xl border flex items-center justify-between gap-2 relative ${
                     p.id === myPlayerId
                       ? 'bg-yellow-400/10 border-yellow-400/50 text-yellow-200'
                       : 'bg-slate-800/60 border-slate-700/60 text-slate-300'
                   }`}
                 >
-                  <span className="text-2xl">{p.isBot ? '🐱' : '👤'}</span>
-                  <div className="truncate text-xs">
-                    <div className="font-bold truncate">{p.name}</div>
-                    <div className="text-[10px] text-slate-500">
-                      {p.id === room.hostId 
-                        ? (lang === 'en' ? 'Host' : 'Chủ phòng (Host)') 
-                        : p.isBot 
-                        ? 'AI Bot' 
-                        : (lang === 'en' ? 'Player' : 'Người chơi')}
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="text-2xl flex-shrink-0">{p.isBot ? '🐱' : '👤'}</span>
+                    <div className="truncate text-xs">
+                      <div className="font-bold truncate">{p.name}</div>
+                      <div className="text-[10px] text-slate-500">
+                        {p.id === room.hostId 
+                          ? (lang === 'en' ? 'Host' : 'Chủ phòng (Host)') 
+                          : p.isBot 
+                          ? 'AI Bot' 
+                          : (lang === 'en' ? 'Player' : 'Người chơi')}
+                      </div>
                     </div>
                   </div>
+
+                  {/* Nút xóa bot riêng lẻ cho chủ phòng */}
+                  {isHost && p.isBot && onRemoveBot && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRemoveBot(p.id);
+                      }}
+                      className="text-slate-500 hover:text-rose-400 hover:bg-rose-950/50 rounded-lg p-1 text-xs transition cursor-pointer flex-shrink-0"
+                      title={lang === 'en' ? `Remove ${p.name}` : `Xóa ${p.name} khỏi phòng`}
+                    >
+                      ✕
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
