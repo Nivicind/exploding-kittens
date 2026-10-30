@@ -16,6 +16,7 @@ import { ComboTargetModal } from './ComboTargetModal';
 import { DiscardPileModal } from './DiscardPileModal';
 import { ImplodingInsertModal } from './ImplodingInsertModal';
 import { AlterFutureModal } from './AlterFutureModal';
+import { RulesModal } from './RulesModal';
 import { GameLog } from './GameLog';
 import { sound } from '../../engine/audio/SoundEffects';
 import { Language, UI_TEXT } from '../i18n';
@@ -111,6 +112,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
   // Modal xác nhận khi chủ động bấm Rời bàn
   const [showLeaveConfirmModal, setShowLeaveConfirmModal] = useState<boolean>(false);
+
+  // Modal hướng dẫn luật chơi
+  const [showRulesModal, setShowRulesModal] = useState<boolean>(false);
 
   // Theo dõi log và index lượt trước đó
   const lastLogIdRef = useRef<string | null>(null);
@@ -635,30 +639,33 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       {/* SPOTLIGHT PHÓNG TO THẺ BÀI VỪA ĐÁNH GIỮA SÂN */}
       <ActionSpotlight data={spotlightData} lang={lang} />
 
-      {/* 1. Header (Cố định h-10 sm:h-11) */}
-      <div className="h-10 sm:h-11 flex-shrink-0 flex items-center justify-between bg-slate-900/90 border border-slate-800 px-3 py-1 rounded-xl shadow-md backdrop-blur-md z-30">
-        <div className="flex items-center gap-1.5">
+      {/* 1. Header (Cố định h-10 sm:h-11, 100% không vỡ dòng, co giãn linh hoạt) */}
+      <div className="h-10 sm:h-11 flex-shrink-0 flex items-center justify-between bg-slate-900/90 border border-slate-800 px-2 sm:px-3 py-1 rounded-xl shadow-md backdrop-blur-md z-30 overflow-hidden gap-1 sm:gap-2">
+        <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
           <span className="text-base sm:text-lg">💣</span>
-          <h2 className="font-black text-xs sm:text-sm text-yellow-400">
+          <h2 className="font-black text-[11px] sm:text-sm text-yellow-400 whitespace-nowrap">
             {t('gameTitle')}
           </h2>
-          <span className="text-[10px] text-slate-400 font-mono hidden sm:inline ml-1">
+          <span className="text-[10px] text-slate-400 font-mono hidden md:inline ml-0.5">
             [{state.id}]
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Lượt hiện tại */}
-          <div className="flex items-center gap-1 text-xs">
-            <span className="text-slate-400 text-[10px] sm:text-[11px] hidden md:inline">{t('turnLabel')}</span>
-            <span className="font-black text-yellow-400 bg-slate-800 px-2 py-0.5 rounded-lg border border-slate-700 text-[10px] sm:text-xs">
-              {currentPlayer?.name} {currentPlayer?.turnsToTake > 1 ? `(${currentPlayer.turnsToTake}L)` : ''}
-            </span>
+        <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-shrink">
+          {/* Lượt hiện tại (Giới hạn độ rộng, chống tràn rớt dòng) */}
+          <div className="flex items-center gap-1 text-xs min-w-0">
+            <span className="text-slate-400 text-[10px] sm:text-[11px] hidden md:inline whitespace-nowrap">{t('turnLabel')}</span>
+            <div className="font-black text-yellow-400 bg-slate-800 px-1.5 sm:px-2 py-0.5 rounded-lg border border-slate-700 text-[10px] sm:text-xs flex items-center gap-1 max-w-[80px] xs:max-w-[110px] sm:max-w-[160px] truncate whitespace-nowrap">
+              <span className="truncate">{currentPlayer?.name}</span>
+              {currentPlayer?.turnsToTake > 1 && (
+                <span className="text-amber-400 flex-shrink-0">({currentPlayer.turnsToTake}L)</span>
+              )}
+            </div>
           </div>
 
           {/* Số bài trên tay của bạn */}
           {myPlayer && (
-            <div className="flex items-center gap-1 bg-slate-800/90 border border-slate-700 px-2 py-0.5 rounded-lg text-[10px] sm:text-xs font-bold text-slate-200">
+            <div className="flex items-center gap-1 bg-slate-800/90 border border-slate-700 px-1.5 sm:px-2 py-0.5 rounded-lg text-[10px] sm:text-xs font-bold text-slate-200 whitespace-nowrap flex-shrink-0">
               <span>🎴</span>
               <span className="text-yellow-400 font-black">{myPlayer.hand.length}</span>
               <span className="text-slate-400 hidden xs:inline">{t('cardsCount')}</span>
@@ -666,28 +673,45 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           )}
         </div>
 
-        <div className="flex items-center gap-1.5 text-xs">
+        <div className="flex items-center gap-1 sm:gap-1.5 text-xs flex-shrink-0">
+          {/* Nút Xem Luật Chơi ❓ */}
+          <button
+            type="button"
+            onClick={() => setShowRulesModal(true)}
+            className="p-1 px-1.5 sm:px-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-yellow-300 font-black text-[10px] sm:text-[11px] border border-slate-700 transition cursor-pointer flex items-center gap-1 active:scale-95"
+            title={lang === 'en' ? 'Game Rules & Guide' : 'Xem luật chơi & hướng dẫn'}
+          >
+            <span>❓</span>
+            <span className="hidden md:inline">{lang === 'en' ? 'Rules' : 'Luật'}</span>
+          </button>
+
           {/* Nút chuyển đổi ngôn ngữ Song ngữ Việt - Anh */}
           <button
+            type="button"
             onClick={handleToggleLang}
-            className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-black text-[10px] sm:text-[11px] transition cursor-pointer flex items-center gap-1 active:scale-95"
+            className="p-1 px-1.5 sm:px-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-black text-[10px] sm:text-[11px] transition cursor-pointer flex items-center gap-1 active:scale-95"
             title={lang === 'vi' ? 'Switch to English' : 'Chuyển sang Tiếng Việt'}
           >
-            <span>{lang === 'vi' ? '🇻🇳 VN' : '🇬🇧 EN'}</span>
+            <span>{lang === 'vi' ? '🇻🇳' : '🇬🇧'}</span>
+            <span className="hidden sm:inline">{lang === 'vi' ? 'VN' : 'EN'}</span>
           </button>
 
           <button
+            type="button"
             onClick={() => sound.toggleMute()}
-            className="p-1 px-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition text-[11px]"
+            className="p-1 px-1.5 sm:px-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition text-[11px] cursor-pointer"
             title={sound.getMuted() ? t('unmute') : t('mute')}
           >
             {sound.getMuted() ? '🔇' : '🔊'}
           </button>
+
           <button
+            type="button"
             onClick={handleLeaveButtonClick}
-            className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-rose-950/60 text-slate-300 hover:text-rose-300 border border-slate-700 transition font-bold text-[11px]"
+            className="px-2 sm:px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-rose-950/60 text-slate-300 hover:text-rose-300 border border-slate-700 transition font-bold text-[10px] sm:text-[11px] whitespace-nowrap cursor-pointer flex items-center gap-1"
           >
-            {t('leaveTable')}
+            <span>🚪</span>
+            <span className="hidden xs:inline">{t('leaveTable')}</span>
           </button>
         </div>
       </div>
@@ -1213,6 +1237,13 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           </div>
         </div>
       )}
+
+      {/* Modal Hướng Dẫn Luật Chơi */}
+      <RulesModal
+        isOpen={showRulesModal}
+        onClose={() => setShowRulesModal(false)}
+        lang={lang}
+      />
     </div>
   );
 };

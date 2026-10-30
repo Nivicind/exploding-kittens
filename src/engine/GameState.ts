@@ -520,7 +520,8 @@ export class GameStateManager {
     if (!def) throw new Error('Không tìm thấy định nghĩa bài.');
 
     if (def.type === 'CAT') {
-      throw new Error('Lá mèo vô tri phải đánh theo Combo 2 hoặc 3 lá.');
+      this.addLog(state, `${player.name} đánh lẻ 1 lá mèo ${def.name} (không có tác dụng gì).`, 'play', player.id);
+      return;
     }
     if (def.type === 'DEFUSE') {
       throw new Error('Lá Defuse chỉ có tác dụng khi rút trúng Mèo Nổ.');

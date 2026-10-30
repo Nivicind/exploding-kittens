@@ -1,7 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { CustomDeckConfig, GameSettings } from '../../engine/types';
 import { CustomDeckModal } from './CustomDeckModal';
+import { RulesModal } from './RulesModal';
 import { Language, UI_TEXT } from '../i18n';
+
+const VI_CAT_NAMES = [
+  'Mèo Cam', 'Mèo Mướp', 'Mèo Tuxedo', 'Mèo Tam Thể', 'Mèo Mập',
+  'Mèo Béo', 'Mèo Ninja', 'Mèo Quý Tộc', 'Mèo Lười', 'Mèo Hạt Tiêu',
+  'Mèo Vô Tri', 'Mèo Mun', 'Mèo Bánh Bao', 'Mèo Cầu Vồng', 'Mèo Chiến Thần'
+];
+
+const EN_CAT_NAMES = [
+  'Ginger Cat', 'Tuxedo Cat', 'Chonky Cat', 'Ninja Cat', 'Lucky Cat',
+  'Grumpy Cat', 'Sleepy Cat', 'Cookie Cat', 'Calico Cat', 'Shadow Cat'
+];
+
+const generateRandomCatName = (targetLang: Language): string => {
+  const list = targetLang === 'en' ? EN_CAT_NAMES : VI_CAT_NAMES;
+  const base = list[Math.floor(Math.random() * list.length)];
+  const num = Math.floor(Math.random() * 90 + 10);
+  return `${base} #${num}`;
+};
 
 interface RoomData {
   id: string;
@@ -57,7 +76,40 @@ export const Lobby: React.FC<LobbyProps> = ({
   };
 
   const [tab, setTab] = useState<'single' | 'multi'>('single');
-  const [playerName, setPlayerName] = useState<string>(lang === 'en' ? 'Me' : 'Tôi');
+  const [playerName, setPlayerName] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('ek_player_name');
+      if (saved && saved.trim()) return saved.trim();
+    }
+    return generateRandomCatName(lang);
+  });
+  const [showRulesModal, setShowRulesModal] = useState<boolean>(false);
+
+  const handleNameChange = (name: string) => {
+    setPlayerName(name);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ek_player_name', name);
+    }
+  };
+
+  const handleRollRandomName = () => {
+    const random = generateRandomCatName(lang);
+    setPlayerName(random);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ek_player_name', random);
+    }
+  };
+
+  const getValidPlayerName = (): string => {
+    const trimmed = playerName.trim();
+    if (trimmed) return trimmed;
+    const random = generateRandomCatName(lang);
+    setPlayerName(random);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ek_player_name', random);
+    }
+    return random;
+  };
   const [singlePlayerCount, setSinglePlayerCount] = useState<number>(4);
   const [joinRoomCode, setJoinRoomCode] = useState<string>('');
   const [showDeckModal, setShowDeckModal] = useState<boolean>(false);
@@ -113,12 +165,21 @@ export const Lobby: React.FC<LobbyProps> = ({
               <span>←</span>
               <span>{lang === 'en' ? 'Leave Room / Menu' : 'Rời Phòng / Về Menu'}</span>
             </button>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2">
               <span className="text-[11px] text-slate-400 font-medium">
                 {isHost 
                   ? (lang === 'en' ? '👑 You are Host' : '👑 Bạn là Chủ phòng') 
                   : (lang === 'en' ? '👤 Player' : '👤 Người chơi')}
               </span>
+              <button
+                type="button"
+                onClick={() => setShowRulesModal(true)}
+                className="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-yellow-300 font-bold text-[10px] border border-slate-700 transition flex items-center gap-1 cursor-pointer"
+                title={lang === 'en' ? 'Game Rules & Guide' : 'Luật chơi & Hướng dẫn'}
+              >
+                <span>❓</span>
+                <span className="hidden sm:inline">{lang === 'en' ? 'Rules' : 'Luật'}</span>
+              </button>
               <button
                 type="button"
                 onClick={handleToggleLang}
@@ -335,8 +396,18 @@ export const Lobby: React.FC<LobbyProps> = ({
   // Màn hình chính ngoài sảnh
   return (
     <div className="relative min-h-[100dvh] w-full bg-slate-950 flex flex-col items-center justify-start sm:justify-center p-3 sm:p-6 py-6 sm:py-10 pb-16 sm:pb-10 overflow-y-auto">
-      {/* Nút chuyển đổi ngôn ngữ Việt / Anh ở góc trên bên phải */}
-      <div className="absolute top-3 right-3 sm:top-5 sm:right-5 z-20">
+      {/* Nút chuyển đổi ngôn ngữ Việt / Anh & Xem luật chơi ở góc trên bên phải */}
+      <div className="absolute top-3 right-3 sm:top-5 sm:right-5 z-20 flex items-center gap-1.5 sm:gap-2">
+        <button
+          type="button"
+          onClick={() => setShowRulesModal(true)}
+          className="px-2.5 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-yellow-300 font-black text-xs border border-slate-700 shadow-md flex items-center gap-1 transition active:scale-95 cursor-pointer backdrop-blur-md"
+          title={lang === 'en' ? 'Rules & Guide' : 'Luật chơi & Hướng dẫn'}
+        >
+          <span>❓</span>
+          <span className="hidden sm:inline">{lang === 'en' ? 'Rules' : 'Luật Chơi'}</span>
+        </button>
+
         <button
           type="button"
           onClick={handleToggleLang}
@@ -361,11 +432,11 @@ export const Lobby: React.FC<LobbyProps> = ({
           </p>
         </div>
 
-        {/* Tab chọn chế độ */}
-        <div className="flex bg-slate-950 p-1.5 rounded-2xl border border-slate-800">
+        {/* Tab chọn chế độ (Đệm rộng rãi, chống dính sát chữ và viền vàng) */}
+        <div className="flex gap-2 sm:gap-2.5 bg-slate-950 p-1.5 sm:p-2 rounded-2xl border border-slate-800">
           <button
             onClick={() => setTab('single')}
-            className={`flex-1 py-2 text-xs font-black uppercase rounded-xl transition cursor-pointer ${
+            className={`flex-1 py-2.5 px-3 text-xs sm:text-xs font-black uppercase rounded-xl transition cursor-pointer ${
               tab === 'single'
                 ? 'bg-yellow-400 text-slate-950 shadow-md'
                 : 'text-slate-400 hover:text-white'
@@ -375,7 +446,7 @@ export const Lobby: React.FC<LobbyProps> = ({
           </button>
           <button
             onClick={() => setTab('multi')}
-            className={`flex-1 py-2 text-xs font-black uppercase rounded-xl transition cursor-pointer ${
+            className={`flex-1 py-2.5 px-3 text-xs sm:text-xs font-black uppercase rounded-xl transition cursor-pointer ${
               tab === 'multi'
                 ? 'bg-yellow-400 text-slate-950 shadow-md'
                 : 'text-slate-400 hover:text-white'
@@ -385,19 +456,34 @@ export const Lobby: React.FC<LobbyProps> = ({
           </button>
         </div>
 
-        {/* Tên người chơi */}
+        {/* Tên người chơi với nút xúc xắc ngẫu nhiên 🎲 */}
         <div>
-          <label className="text-xs font-bold text-slate-300 block mb-1">
-            {lang === 'en' ? 'Your Name:' : 'Tên của bạn:'}
-          </label>
-          <input
-            type="text"
-            value={playerName}
-            onChange={e => setPlayerName(e.target.value)}
-            maxLength={18}
-            className="w-full bg-slate-950 border border-slate-700 px-4 py-2.5 rounded-xl text-sm font-semibold text-white focus:outline-none focus:border-yellow-400 transition"
-            placeholder={lang === 'en' ? 'Enter player name...' : 'Nhập tên người chơi...'}
-          />
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-xs font-bold text-slate-300">
+              {lang === 'en' ? 'Your Name:' : 'Tên của bạn:'}
+            </label>
+            <span className="text-[10px] text-slate-400 flex items-center gap-1">
+              <span>Bấm 🎲 đổi tên ngẫu nhiên</span>
+            </span>
+          </div>
+          <div className="relative flex items-center">
+            <input
+              type="text"
+              value={playerName}
+              onChange={e => handleNameChange(e.target.value)}
+              maxLength={18}
+              className="w-full bg-slate-950 border border-slate-700 pl-4 pr-11 py-2.5 rounded-xl text-sm font-semibold text-white focus:outline-none focus:border-yellow-400 transition"
+              placeholder={lang === 'en' ? 'Enter player name...' : 'Nhập tên người chơi...'}
+            />
+            <button
+              type="button"
+              onClick={handleRollRandomName}
+              title={lang === 'en' ? 'Roll random cat name' : 'Đổi tên Mèo ngẫu nhiên 🎲'}
+              className="absolute right-1.5 p-1.5 text-base hover:scale-115 active:scale-95 transition cursor-pointer text-slate-400 hover:text-yellow-400"
+            >
+              🎲
+            </button>
+          </div>
         </div>
 
         {/* Nội dung Tab Chơi Đơn vs AI */}
@@ -501,7 +587,7 @@ export const Lobby: React.FC<LobbyProps> = ({
 
               <button
                 type="button"
-                onClick={() => onCreateSinglePlayer(playerName, singlePlayerCount, deckConfig, { nopeTimeoutSec, botDelaySec })}
+                onClick={() => onCreateSinglePlayer(getValidPlayerName(), singlePlayerCount, deckConfig, { nopeTimeoutSec, botDelaySec })}
                 className="flex-[1.5] py-3.5 px-3 bg-yellow-400 hover:bg-yellow-300 text-slate-950 font-black text-xs sm:text-sm uppercase rounded-2xl shadow-xl shadow-yellow-400/20 transition transform active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <span>⚡</span>
@@ -537,7 +623,7 @@ export const Lobby: React.FC<LobbyProps> = ({
 
               <button
                 type="button"
-                onClick={() => onCreateMultiplayer(playerName, deckConfig, { nopeTimeoutSec, botDelaySec })}
+                onClick={() => onCreateMultiplayer(getValidPlayerName(), deckConfig, { nopeTimeoutSec, botDelaySec })}
                 className="flex-[1.5] py-3.5 px-3 bg-yellow-400 hover:bg-yellow-300 text-slate-950 font-black text-xs sm:text-sm uppercase rounded-2xl shadow-xl shadow-yellow-400/20 transition transform active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <span>🚀</span>
@@ -561,7 +647,7 @@ export const Lobby: React.FC<LobbyProps> = ({
                 className="w-full bg-slate-950 border border-slate-700 px-4 py-2.5 rounded-xl text-center text-sm font-mono tracking-widest font-black uppercase text-white focus:outline-none focus:border-yellow-400 transition"
               />
               <button
-                onClick={() => onJoinMultiplayer(joinRoomCode, playerName)}
+                onClick={() => onJoinMultiplayer(joinRoomCode, getValidPlayerName())}
                 disabled={!joinRoomCode}
                 className="w-full py-3.5 bg-slate-800 hover:bg-slate-700 text-white font-black text-sm uppercase rounded-2xl border border-slate-700 transition disabled:opacity-50 cursor-pointer"
               >
@@ -579,6 +665,13 @@ export const Lobby: React.FC<LobbyProps> = ({
         config={deckConfig}
         onSave={cfg => setDeckConfig(cfg)}
         playerCount={singlePlayerCount}
+        lang={lang}
+      />
+
+      {/* Modal hướng dẫn luật chơi */}
+      <RulesModal
+        isOpen={showRulesModal}
+        onClose={() => setShowRulesModal(false)}
         lang={lang}
       />
     </div>

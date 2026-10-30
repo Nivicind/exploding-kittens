@@ -43,6 +43,51 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
   const [selectedUids, setSelectedUids] = useState<string[]>([]);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
+  // Chế độ sắp xếp bài tự động gom các lá bài cùng loại / cùng cặp cạnh nhau
+  const [isSorted, setIsSorted] = useState<boolean>(() => {
+    return typeof window !== 'undefined' ? localStorage.getItem('ek_sort_hand') !== 'false' : true;
+  });
+
+  // Modal cảnh báo đánh bài không có tác dụng
+  const [showIneffectiveModal, setShowIneffectiveModal] = useState<boolean>(false);
+
+  const handleToggleSort = () => {
+    const next = !isSorted;
+    setIsSorted(next);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ek_sort_hand', next ? 'true' : 'false');
+    }
+    sound.playCardPlay();
+  };
+
+  const typeOrder: Record<string, number> = {
+    DEFUSE: 1,
+    CAT: 2,
+    ATTACK: 3,
+    TARGETED_ATTACK: 4,
+    SKIP: 5,
+    REVERSE: 6,
+    FAVOR: 7,
+    SHUFFLE: 8,
+    SEE_THE_FUTURE: 9,
+    ALTER_THE_FUTURE: 10,
+    DRAW_FROM_BOTTOM: 11,
+    NOPE: 12,
+  };
+
+  // Danh sách bài hiển thị (được sắp xếp theo cặp/loại hoặc giữ nguyên theo tùy chọn)
+  const displayCards = React.useMemo(() => {
+    if (!isSorted) return player.hand;
+    return [...player.hand].sort((a, b) => {
+      const defA = CardRegistry.getCard(a.defId);
+      const defB = CardRegistry.getCard(b.defId);
+      const orderA = defA ? (typeOrder[defA.type] ?? 20) : 99;
+      const orderB = defB ? (typeOrder[defB.type] ?? 20) : 99;
+      if (orderA !== orderB) return orderA - orderB;
+      return a.defId.localeCompare(b.defId);
+    });
+  }, [player.hand, isSorted]);
+
   // Tự động lọc bỏ các UID bài đã bị mất / bị cướp / đã đánh ra khỏi tay
   useEffect(() => {
     setSelectedUids(prev => prev.filter(uid => player.hand.some(c => c.uid === uid)));
@@ -98,7 +143,8 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
 
   if (count === 1) {
     singleCardDef = CardRegistry.getCard(selectedCards[0].defId);
-    if (singleCardDef && singleCardDef.type !== 'CAT' && singleCardDef.type !== 'DEFUSE' && singleCardDef.type !== 'KITTEN') {
+    // Cho phép đánh đơn lá bài chức năng, lá Nope hoặc đánh lẻ 1 lá mèo
+    if (singleCardDef && singleCardDef.type !== 'DEFUSE' && singleCardDef.type !== 'KITTEN') {
       canPlaySingle = true;
     }
   } else if (count === 2) {
@@ -116,10 +162,19 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
     }
   }
 
-  const executePlay = () => {
+  // Nhận biết hành động không có tác dụng: Đánh Nope ngoài cửa sổ Nope hoặc đánh lẻ 1 lá mèo
+  const isSelectedPlayIneffective = count === 1 && (
+    selectedCards[0].defId === 'nope' ? !isNopeWindow : singleCardDef?.type === 'CAT'
+  );
+
+  const executePlay = (force = false) => {
     if (!isMyTurn && !selectedCards.some(c => c.defId === 'nope')) return;
 
     if (canPlaySingle) {
+      if (isSelectedPlayIneffective && !force) {
+        setShowIneffectiveModal(true);
+        return;
+      }
       onPlaySingleCard(selectedCards[0].uid, selectedCards[0].defId);
       clearSelection();
     } else if (canPlayComboTwo) {
@@ -224,16 +279,21 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
 
           {canPlaySingle && (
             <button
-              onClick={executePlay}
-              className="py-1 px-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-[11px] uppercase rounded-xl shadow-md transition"
+              onClick={() => executePlay(false)}
+              className={`py-1 px-3 text-slate-950 font-black text-[11px] uppercase rounded-xl shadow-md transition flex items-center gap-1 ${
+                isSelectedPlayIneffective
+                  ? 'bg-amber-400 hover:bg-amber-300 text-slate-950'
+                  : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950'
+              }`}
             >
-              {UI_TEXT[lang].playCardBtn(singleCardName)}
+              {isSelectedPlayIneffective && <span>⚠️</span>}
+              <span>{UI_TEXT[lang].playCardBtn(singleCardName)}</span>
             </button>
           )}
 
           {canPlayComboTwo && (
             <button
-              onClick={executePlay}
+              onClick={() => executePlay(false)}
               className="py-1 px-3 bg-yellow-400 hover:bg-yellow-300 text-slate-950 font-black text-[11px] uppercase rounded-xl shadow-md transition"
             >
               {UI_TEXT[lang].combo2Btn}
@@ -242,7 +302,7 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
 
           {canPlayComboThree && (
             <button
-              onClick={executePlay}
+              onClick={() => executePlay(false)}
               className="py-1 px-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[11px] uppercase rounded-xl shadow-md transition"
             >
               {UI_TEXT[lang].combo3Btn}
@@ -251,7 +311,7 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
 
           {canPlayComboFive && (
             <button
-              onClick={executePlay}
+              onClick={() => executePlay(false)}
               className="py-1 px-3 bg-fuchsia-500 hover:bg-fuchsia-400 text-white font-black text-[11px] uppercase rounded-xl shadow-md transition"
             >
               {UI_TEXT[lang].combo5Btn}
@@ -275,10 +335,27 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
         </div>
       )}
 
+      {/* Nút bật/tắt Tự động sắp xếp bộ bài (Gom cặp mèo, loại bài cho tiện tìm) */}
+      {totalCards > 1 && (
+        <button
+          type="button"
+          onClick={handleToggleSort}
+          title={lang === 'en' ? 'Toggle card sorting' : 'Bật/tắt tự động sắp xếp bài'}
+          className={`absolute -top-7 right-3 sm:right-6 z-30 flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-black shadow-lg backdrop-blur-md transition border cursor-pointer ${
+            isSorted
+              ? 'bg-amber-500/20 text-amber-300 border-amber-400/50 hover:bg-amber-500/30'
+              : 'bg-slate-800/80 text-slate-400 border-slate-600/50 hover:bg-slate-700/80 hover:text-white'
+          }`}
+        >
+          <span>🔀</span>
+          <span>{isSorted ? (lang === 'en' ? 'Sorted' : 'Đã gom cặp') : (lang === 'en' ? 'Sort Hand' : 'Sắp xếp')}</span>
+        </button>
+      )}
+
       {/* DANH SÁCH LÁ BÀI XÒE QUẠT SO LE & HOVER TÁCH BÀI (HỖ TRỢ CẢ MOBILE VÀ PC - KHÔNG BỊ CẮT ĐỨT) */}
       <div className={`w-full overflow-x-auto sm:overflow-visible overflow-y-visible pt-16 sm:pt-20 pb-3 px-8 flex justify-start sm:justify-center items-end ${overlapClass} touch-pan-x`}>
         <AnimatePresence initial={false}>
-          {player.hand.map((card, idx) => {
+          {displayCards.map((card, idx) => {
             const isSelected = selectedUids.includes(card.uid);
             const isNopeCard = card.defId === 'nope';
             const showNopeGlow = isNopeWindow && isNopeCard;
@@ -370,6 +447,48 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
           })}
         </AnimatePresence>
       </div>
+
+      {/* MODAL CẢNH BÁO ĐÁNH BÀI KHÔNG CÓ TÁC DỤNG (NOPE KHI KHÔNG CÓ AI ĐÁNH HOẶC ĐÁNH LẺ 1 MÈO) */}
+      {showIneffectiveModal && (
+        <div className="fixed inset-0 z-[120] bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-slate-900 border-2 border-amber-500/80 rounded-2xl p-5 sm:p-6 max-w-sm w-full shadow-2xl text-center space-y-4">
+            <div className="text-4xl animate-bounce">⚠️</div>
+            <h3 className="text-base sm:text-lg font-black text-amber-400">
+              {lang === 'en' ? 'Card Has No Effect!' : 'Lá bài không có tác dụng!'}
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed text-left bg-slate-950/50 p-3 rounded-xl border border-slate-800">
+              {selectedCards[0]?.defId === 'nope' ? (
+                lang === 'en'
+                  ? 'Currently, no action is pending to cancel with NOPE! If you play this card right now, you will lose it without stopping anything.'
+                  : 'Hiện không có hành động nào của người khác để chặn (Nope)! Nếu đánh lúc này, bạn chỉ bị mất lá bài.'
+              ) : (
+                lang === 'en'
+                  ? 'Playing a single Cat Card has no special effect (you need 2 or 3 matching cats to steal cards). If you play this, you will just discard it.'
+                  : 'Đánh lẻ 1 lá mèo thường không có tác dụng gì (bạn cần ghép 2 hoặc 3 lá cùng loại để cướp bài). Nếu đánh, lá bài này sẽ chỉ bị bỏ đi.'
+              )}
+            </p>
+            <div className="flex items-center gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowIneffectiveModal(false)}
+                className="flex-1 py-2 px-3 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs sm:text-sm font-bold rounded-xl transition cursor-pointer"
+              >
+                {lang === 'en' ? 'Keep Card' : 'Giữ lại bài'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowIneffectiveModal(false);
+                  executePlay(true);
+                }}
+                className="flex-1 py-2 px-3 bg-amber-600 hover:bg-amber-500 text-white text-xs sm:text-sm font-black rounded-xl shadow-lg transition cursor-pointer"
+              >
+                {lang === 'en' ? 'Discard Anyway' : 'Vẫn đánh bỏ'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
