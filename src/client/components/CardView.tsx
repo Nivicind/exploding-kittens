@@ -1,6 +1,7 @@
 import React from 'react';
 import { CardInstance } from '../../engine/types';
 import { CardRegistry } from '../../engine/CardRegistry';
+import { CARD_I18N, Language } from '../i18n';
 
 interface CardViewProps {
   card?: CardInstance;
@@ -12,6 +13,7 @@ interface CardViewProps {
   highlight?: boolean;
   className?: string;
   style?: React.CSSProperties;
+  lang?: Language;
 }
 
 // Bảng màu Full-Color nguyên bản của Exploding Kittens
@@ -40,11 +42,14 @@ export const CardView: React.FC<CardViewProps> = ({
   disabled = false,
   highlight = false,
   className = '',
-  style = {}
+  style = {},
+  lang
 }) => {
+  const currentLang: Language = lang || (typeof window !== 'undefined' ? (localStorage.getItem('ek_lang') as Language || 'vi') : 'vi');
   const definitionId = defId || card?.defId || 'defuse';
   const def = CardRegistry.getCard(definitionId);
   const theme = CARD_PALETTE[definitionId] || { bg: '#334155', border: '#94a3b8', text: '#ffffff', badge: 'LÁ BÀI' };
+  const i18nData = CARD_I18N[definitionId]?.[currentLang];
 
   if (!def) {
     return (
@@ -53,6 +58,11 @@ export const CardView: React.FC<CardViewProps> = ({
       </div>
     );
   }
+
+  const cardName = i18nData?.name || (currentLang === 'en' ? def.nameEn : def.nameVi);
+  const cardBadge = i18nData?.badge || theme.badge;
+  const subName = i18nData?.subName || (currentLang === 'en' ? def.nameVi : def.nameEn);
+  const descText = i18nData?.description || def.description;
 
   // Kiểu dáng thẻ bài thu nhỏ (Compact cho modal hoặc history)
   if (isCompact) {
@@ -64,24 +74,24 @@ export const CardView: React.FC<CardViewProps> = ({
           isSelected ? 'ring-4 ring-yellow-400 scale-105 z-30' : ''
         } ${!disabled && onClick ? 'cursor-pointer hover:scale-105 hover:brightness-110' : ''} ${className}`}
       >
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between px-0.5">
           <span className="text-base">{def.icon}</span>
-          <span className="text-[8px] font-black tracking-tight px-1 py-0.2 rounded bg-black/40 text-white">
-            {theme.badge}
+          <span className="text-[8px] font-black tracking-tight px-1.5 py-0.5 rounded bg-black/45 text-white">
+            {cardBadge}
           </span>
         </div>
-        <div className="bg-white/95 text-slate-900 rounded-xl p-1 my-0.5 text-center shadow-inner border border-black/20">
+        <div className="bg-white/95 text-slate-900 rounded-xl p-1.5 my-0.5 text-center shadow-inner border border-black/20">
           <div className="text-2xl">{def.icon}</div>
-          <p className="text-[10px] font-black leading-tight line-clamp-1">{def.nameVi}</p>
+          <p className="text-[10px] font-black leading-tight line-clamp-1">{cardName}</p>
         </div>
-        <div className="text-[8px] font-bold text-center text-white/90 truncate">
-          {def.nameEn}
+        <div className="text-[8px] font-bold text-center text-white/90 truncate px-0.5">
+          {subName}
         </div>
       </div>
     );
   }
 
-  // Kiểu dáng Full-Color Minimal chuẩn gốc Exploding Kittens - Tối ưu tỷ lệ không tràn chữ
+  // Kiểu dáng Full-Color Minimal chuẩn gốc Exploding Kittens - Tối ưu tỷ lệ không tràn chữ & khoảng cách cân đối
   return (
     <div
       onClick={!disabled ? onClick : undefined}
@@ -97,38 +107,44 @@ export const CardView: React.FC<CardViewProps> = ({
       } ${disabled ? 'opacity-50 grayscale cursor-not-allowed' : ''} ${className}`}
     >
       {/* 1. Header: Biểu tượng & Tên danh mục in hoa */}
-      <div className="flex items-center justify-between flex-shrink-0 mb-1">
-        <div className="flex items-center gap-1 bg-black/40 px-1.5 py-0.5 rounded-md border border-white/20">
+      <div className="flex items-center justify-between flex-shrink-0 mb-1 px-0.5">
+        <div className="flex items-center gap-1 bg-black/45 px-1.5 py-0.5 rounded-md border border-white/20">
           <span className="text-xs">{def.icon}</span>
-          <span className="text-[9px] font-black uppercase tracking-wider text-white">
-            {theme.badge}
+          <span className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider text-white">
+            {cardBadge}
           </span>
         </div>
-        <span className="text-[8px] sm:text-[9px] font-bold text-white/80 uppercase truncate max-w-[65px]">
-          {def.nameEn}
+        <span className="text-[7.5px] sm:text-[8.5px] font-bold text-white/80 uppercase truncate max-w-[65px] px-0.5">
+          {subName}
         </span>
       </div>
 
       {/* 2. Khung tranh truyện tranh trung tâm (Comic Illustration Plate) */}
-      <div className="bg-white rounded-xl py-1 px-1.5 flex flex-col items-center justify-center text-slate-950 border-2 border-black/30 shadow-sm flex-shrink-0">
+      <div className="bg-white rounded-xl py-1.5 px-2 flex flex-col items-center justify-center text-slate-950 border-2 border-black/30 shadow-sm flex-shrink-0 mx-0.5">
         <div className="text-2xl sm:text-3xl filter drop-shadow">
           {def.icon}
         </div>
-        <h4 className="text-[10px] sm:text-[11px] font-black text-slate-900 tracking-tight leading-tight text-center mt-0.5">
-          {def.nameVi}
+        <h4 className="text-[10px] sm:text-[11px] font-black text-slate-900 tracking-tight leading-tight text-center mt-0.5 px-1 truncate w-full">
+          {cardName}
         </h4>
       </div>
 
-      {/* 3. Khung hướng dẫn: Đầy đủ không gian, hiển thị toàn bộ chữ không bị cắt bớt */}
-      <div className="my-auto py-1 px-1.5 bg-black/40 rounded-lg border border-white/10 flex items-center justify-center text-center overflow-visible">
-        <p className="text-[8px] sm:text-[9px] font-semibold leading-tight text-white/95 break-words">
-          {def.description}
+      {/* 3. Khung hướng dẫn: Dynamic font size & đệm viền đồng đều (không bao giờ sát mép) */}
+      <div className="my-auto p-1.5 sm:p-2 bg-black/45 rounded-xl border border-white/15 flex items-center justify-center text-center overflow-hidden">
+        <p className={`font-semibold text-white/95 break-words text-center px-0.5 ${
+          descText.length > 85
+            ? 'text-[7px] sm:text-[7.5px] md:text-[8px] leading-tight'
+            : descText.length > 55
+            ? 'text-[7.5px] sm:text-[8.5px] md:text-[9px] leading-snug'
+            : 'text-[8.5px] sm:text-[9.5px] md:text-[10px] leading-snug'
+        }`}>
+          {descText}
         </p>
       </div>
 
       {/* 4. Footer đối xứng gọn gàng */}
-      <div className="flex justify-between items-center text-[7px] text-white/50 flex-shrink-0 pt-0.5">
-        <span>EK ORIGINAL</span>
+      <div className="flex justify-between items-center text-[7px] text-white/50 flex-shrink-0 pt-0.5 px-0.5">
+        <span>EK {currentLang === 'en' ? 'EDITION' : 'ORIGINAL'}</span>
         <span className="font-mono font-black">{def.icon}</span>
       </div>
 

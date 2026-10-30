@@ -3,6 +3,7 @@ import { io, Socket } from 'socket.io-client';
 import { GameState, CustomDeckConfig, GameSettings } from '../engine/types';
 import { Lobby } from './components/Lobby';
 import { GameBoard } from './components/GameBoard';
+import { Language } from './i18n';
 
 interface RoomData {
   id: string;
@@ -21,6 +22,16 @@ export const App: React.FC = () => {
   const [lanIp, setLanIp] = useState<string>('localhost');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [toastNotification, setToastNotification] = useState<string | null>(null);
+
+  const [lang, setLang] = useState<Language>(() => {
+    return (typeof window !== 'undefined' ? (localStorage.getItem('ek_lang') as Language) || 'vi' : 'vi');
+  });
+
+  const handleToggleLang = () => {
+    const next: Language = lang === 'vi' ? 'en' : 'vi';
+    setLang(next);
+    if (typeof window !== 'undefined') localStorage.setItem('ek_lang', next);
+  };
 
   // Khởi tạo Socket.IO kết nối & Tự động kết nối lại khi tải lại trang (F5)
   useEffect(() => {
@@ -50,7 +61,11 @@ export const App: React.FC = () => {
                 setRoomId(saved.roomId);
                 setMyPlayerId(saved.playerId);
                 setRoom(res.room);
-                setToastNotification('⚡ Đã kết nối lại ván đấu! (AI đã chơi hộ trong lúc bạn vắng mặt)');
+                setToastNotification(
+                  lang === 'en' 
+                    ? '⚡ Reconnected to match! (AI played for you while away)' 
+                    : '⚡ Đã kết nối lại ván đấu! (AI đã chơi hộ trong lúc bạn vắng mặt)'
+                );
                 setTimeout(() => setToastNotification(null), 5000);
               } else {
                 sessionStorage.removeItem('ek_session');
@@ -254,6 +269,8 @@ export const App: React.FC = () => {
           onPickDiscard={handlePickDiscard}
           onCloseSeeFuture={handleCloseSeeFuture}
           onLeaveGame={handleLeaveGame}
+          lang={lang}
+          onToggleLang={handleToggleLang}
         />
       ) : (
         <Lobby
@@ -268,6 +285,8 @@ export const App: React.FC = () => {
           onUpdateDeckConfig={handleUpdateDeckConfig}
           onUpdateSettings={handleUpdateSettings}
           onLeaveRoom={handleLeaveGame}
+          lang={lang}
+          onToggleLang={handleToggleLang}
         />
       )}
     </div>

@@ -4,6 +4,7 @@ import { CardInstance, PlayerState } from '../../engine/types';
 import { CardRegistry } from '../../engine/CardRegistry';
 import { CardView } from './CardView';
 import { sound } from '../../engine/audio/SoundEffects';
+import { Language, UI_TEXT, CARD_I18N } from '../i18n';
 
 interface PlayerHandProps {
   player: PlayerState;
@@ -19,6 +20,7 @@ interface PlayerHandProps {
   onPlayComboFive: (cardUids: string[]) => void;
   onPlayNope?: (cardUid: string) => void;
   disabled?: boolean;
+  lang?: Language;
 }
 
 export const PlayerHand: React.FC<PlayerHandProps> = ({
@@ -34,7 +36,8 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
   onPlayComboThree,
   onPlayComboFive,
   onPlayNope,
-  disabled = false
+  disabled = false,
+  lang = 'vi'
 }) => {
   const [selectedUids, setSelectedUids] = useState<string[]>([]);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
@@ -143,13 +146,17 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
       ? '-space-x-10 sm:-space-x-12 md:-space-x-8' 
       : '-space-x-6 sm:-space-x-8';
 
+  const singleCardName = selectedCards[0]
+    ? (CARD_I18N[selectedCards[0].defId]?.[lang]?.name || singleCardDef?.nameVi || selectedCards[0].defId)
+    : '';
+
   return (
     <div className="flex flex-col items-center w-full relative h-full justify-end overflow-visible">
       {/* 1. THÔNG BÁO BỊ CƯỚP BÀI / BỊ TẤN CÔNG (HIỂN THỊ NỔI PHÍA TRÊN BÀN TAY) */}
       {stolenNotification && !isGiveFavorMode && (
-        <div className="absolute -top-12 sm:-top-14 z-50 flex items-center gap-2 bg-rose-950/95 border-2 border-rose-500 px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl shadow-2xl backdrop-blur-md animate-fade-in max-w-[90vw]">
+        <div className="absolute -top-12 sm:-top-14 z-50 flex items-center gap-2 bg-rose-950/95 border-2 border-rose-500 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-2xl shadow-2xl backdrop-blur-md animate-fade-in max-w-[90vw]">
           <span className="text-sm sm:text-base animate-bounce">🦹‍♂️</span>
-          <span className="text-[11px] sm:text-xs font-black text-rose-200 truncate">
+          <span className="text-[11px] sm:text-xs font-black text-rose-200 truncate px-0.5">
             {stolenNotification}
           </span>
         </div>
@@ -157,16 +164,16 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
 
       {/* Thông báo lượt đi & số lá bài phải bốc (luôn hiển thị rõ ràng khi đến lượt) */}
       {isMyTurn && !stolenNotification && !isGiveFavorMode && count === 0 && (
-        <div className={`absolute -top-12 sm:-top-14 z-40 px-3 sm:px-4 py-1 sm:py-1.5 rounded-full shadow-2xl backdrop-blur-md flex items-center gap-1.5 sm:gap-2 animate-pulse max-w-[92vw] ${
+        <div className={`absolute -top-12 sm:-top-14 z-40 px-3.5 sm:px-4 py-1.5 rounded-full shadow-2xl backdrop-blur-md flex items-center gap-1.5 sm:gap-2 animate-pulse max-w-[92vw] ${
           player.turnsToTake > 1
             ? 'bg-amber-950/95 border-2 border-amber-400/90'
             : 'bg-emerald-950/95 border-2 border-emerald-400/90'
         }`}>
           <span className="text-sm sm:text-base">{player.turnsToTake > 1 ? '⚔️' : '👉'}</span>
-          <span className={`text-[10px] sm:text-xs font-black truncate ${player.turnsToTake > 1 ? 'text-amber-300' : 'text-emerald-300'}`}>
+          <span className={`text-[10px] sm:text-xs font-black truncate px-0.5 ${player.turnsToTake > 1 ? 'text-amber-300' : 'text-emerald-300'}`}>
             {player.turnsToTake > 1
-              ? `Đang bị tấn công! Phải bốc ${player.turnsToTake} lá (hoặc đánh bài)`
-              : 'Đến lượt bạn! Bốc 1 lá (hoặc đánh bài)'}
+              ? UI_TEXT[lang].yourTurnAttack(player.turnsToTake)
+              : UI_TEXT[lang].yourTurnDraw1}
           </span>
         </div>
       )}
@@ -177,7 +184,7 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
           {count === 1 ? (
             <div className="flex items-center gap-2.5 bg-slate-900/95 border-2 border-teal-400 px-4 py-2 rounded-2xl shadow-2xl backdrop-blur-md">
               <span className="text-xs font-bold text-slate-200">
-                🎁 Giao nộp lá <strong className="text-teal-300">{singleCardDef?.nameVi || selectedCards[0]?.defId}</strong> cho <strong className="text-yellow-400">{favorInitiatorName}</strong>:
+                🎁 {lang === 'en' ? 'Give' : 'Giao nộp lá'} <strong className="text-teal-300">{singleCardName}</strong> {lang === 'en' ? 'to' : 'cho'} <strong className="text-yellow-400">{favorInitiatorName}</strong>:
               </span>
               <button
                 type="button"
@@ -187,23 +194,23 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
                     clearSelection();
                   }
                 }}
-                className="py-1 px-4 bg-teal-400 hover:bg-teal-300 text-slate-950 font-black text-xs uppercase rounded-xl shadow-md transition transform active:scale-95 cursor-pointer"
+                className="py-1 px-3.5 bg-teal-400 hover:bg-teal-300 text-slate-950 font-black text-xs uppercase rounded-xl shadow-md transition transform active:scale-95 cursor-pointer"
               >
-                Xác Nhận Đưa Lá Này ➔
+                {UI_TEXT[lang].confirmGive}
               </button>
               <button
                 type="button"
                 onClick={clearSelection}
-                className="text-[10px] text-slate-400 hover:text-white px-1.5 py-0.5 rounded transition cursor-pointer"
+                className="text-[10px] text-slate-400 hover:text-white px-2 py-0.5 rounded transition cursor-pointer"
               >
-                Đổi lá
+                {UI_TEXT[lang].changeCard}
               </button>
             </div>
           ) : (
             <div className="bg-teal-950/95 border-2 border-teal-400/90 px-4 py-1.5 rounded-full shadow-2xl backdrop-blur-md flex items-center gap-2 animate-pulse">
               <span className="text-base">🎁</span>
               <span className="text-xs font-black text-teal-300">
-                {favorInitiatorName} đang xin bạn 1 lá bài! Hãy nhấp chọn 1 lá trên tay để đưa cho họ.
+                {UI_TEXT[lang].favorAskNotify(favorInitiatorName)}
               </span>
             </div>
           )}
@@ -212,9 +219,9 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
 
       {/* 3. THANH CÔNG CỤ KHI CHỌN BÀI ĐỂ ĐÁNH BÌNH THƯỜNG */}
       {!isGiveFavorMode && count > 0 && (
-        <div className="absolute -top-14 z-50 flex items-center gap-2 bg-slate-900/95 border-2 border-yellow-400 px-3 py-1.5 rounded-2xl shadow-2xl backdrop-blur-md animate-fade-in">
+        <div className="absolute -top-14 z-50 flex items-center gap-2 bg-slate-900/95 border-2 border-yellow-400 px-3.5 py-1.5 rounded-2xl shadow-2xl backdrop-blur-md animate-fade-in">
           <span className="text-[11px] font-bold text-slate-300">
-            Đã chọn: <strong className="text-yellow-400">{count} lá</strong>
+            {UI_TEXT[lang].selectedCards} <strong className="text-yellow-400">{count} {UI_TEXT[lang].cardsUnit}</strong>
           </span>
 
           {canPlaySingle && (
@@ -222,7 +229,7 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
               onClick={executePlay}
               className="py-1 px-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-[11px] uppercase rounded-xl shadow-md transition"
             >
-              Đánh {singleCardDef?.nameVi}
+              {UI_TEXT[lang].playCardBtn(singleCardName)}
             </button>
           )}
 
@@ -231,7 +238,7 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
               onClick={executePlay}
               className="py-1 px-3 bg-yellow-400 hover:bg-yellow-300 text-slate-950 font-black text-[11px] uppercase rounded-xl shadow-md transition"
             >
-              ⚡ Combo 2 Lá
+              {UI_TEXT[lang].combo2Btn}
             </button>
           )}
 
@@ -240,7 +247,7 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
               onClick={executePlay}
               className="py-1 px-3 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[11px] uppercase rounded-xl shadow-md transition"
             >
-              👑 Combo 3 Lá
+              {UI_TEXT[lang].combo3Btn}
             </button>
           )}
 
@@ -249,23 +256,23 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
               onClick={executePlay}
               className="py-1 px-3 bg-fuchsia-500 hover:bg-fuchsia-400 text-white font-black text-[11px] uppercase rounded-xl shadow-md transition"
             >
-              🌟 Combo 5 Lá
+              {UI_TEXT[lang].combo5Btn}
             </button>
           )}
 
           {!canPlaySingle && !canPlayComboTwo && !canPlayComboThree && !canPlayComboFive && (
-            <span className="text-[10px] text-slate-400 italic">
+            <span className="text-[10px] text-slate-400 italic px-1">
               {count === 1 && selectedCards[0]?.defId.startsWith('cat_')
-                ? 'Lá mèo vô tri: cần chọn thêm lá giống nhau'
-                : 'Tổ hợp chưa hợp lệ'}
+                ? UI_TEXT[lang].catCardHint
+                : UI_TEXT[lang].invalidCombo}
             </span>
           )}
 
           <button
             onClick={clearSelection}
-            className="text-[10px] text-slate-400 hover:text-white px-1.5 py-0.5 rounded transition"
+            className="text-[10px] text-slate-400 hover:text-white px-2 py-0.5 rounded transition cursor-pointer"
           >
-            Bỏ chọn
+            {UI_TEXT[lang].deselect}
           </button>
         </div>
       )}
@@ -340,13 +347,14 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
                       }}
                       className="py-1 px-2.5 sm:px-3 bg-rose-600 hover:bg-rose-500 text-white font-black text-[10px] sm:text-xs uppercase rounded-full shadow-2xl shadow-rose-600/90 border-2 border-rose-300 flex items-center gap-1 animate-bounce cursor-pointer whitespace-nowrap"
                     >
-                      <span>🚫</span> ĐÁNH NOPE!
+                      <span>🚫</span> {lang === 'en' ? 'PLAY NOPE!' : 'ĐÁNH NOPE!'}
                     </button>
                   </div>
                 )}
 
                 <CardView
                   card={card}
+                  lang={lang}
                   isSelected={isSelected}
                   onClick={() => handleCardClick(card)}
                   disabled={disabled && !showNopeGlow && !isGiveFavorMode}

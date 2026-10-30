@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CustomDeckConfig, GameSettings } from '../../engine/types';
 import { CustomDeckModal } from './CustomDeckModal';
+import { Language, UI_TEXT } from '../i18n';
 
 interface RoomData {
   id: string;
@@ -22,6 +23,8 @@ interface LobbyProps {
   onUpdateDeckConfig: (config: CustomDeckConfig) => void;
   onUpdateSettings?: (settings: GameSettings) => void;
   onLeaveRoom?: () => void;
+  lang?: Language;
+  onToggleLang?: () => void;
 }
 
 export const Lobby: React.FC<LobbyProps> = ({
@@ -35,10 +38,26 @@ export const Lobby: React.FC<LobbyProps> = ({
   onStartGame,
   onUpdateDeckConfig,
   onUpdateSettings,
-  onLeaveRoom
+  onLeaveRoom,
+  lang: langProp,
+  onToggleLang: onToggleLangProp
 }) => {
+  const [internalLang, setInternalLang] = useState<Language>(() => {
+    return (typeof window !== 'undefined' ? (localStorage.getItem('ek_lang') as Language) || 'vi' : 'vi');
+  });
+  const lang = langProp || internalLang;
+  const handleToggleLang = () => {
+    if (onToggleLangProp) {
+      onToggleLangProp();
+    } else {
+      const next: Language = lang === 'vi' ? 'en' : 'vi';
+      setInternalLang(next);
+      if (typeof window !== 'undefined') localStorage.setItem('ek_lang', next);
+    }
+  };
+
   const [tab, setTab] = useState<'single' | 'multi'>('single');
-  const [playerName, setPlayerName] = useState<string>('Tôi');
+  const [playerName, setPlayerName] = useState<string>(lang === 'en' ? 'Me' : 'Tôi');
   const [singlePlayerCount, setSinglePlayerCount] = useState<number>(4);
   const [joinRoomCode, setJoinRoomCode] = useState<string>('');
   const [showDeckModal, setShowDeckModal] = useState<boolean>(false);
@@ -84,7 +103,7 @@ export const Lobby: React.FC<LobbyProps> = ({
     return (
       <div className="min-h-[100dvh] w-full bg-slate-950 flex flex-col items-center justify-start sm:justify-center p-3 sm:p-6 py-6 sm:py-10 pb-16 sm:pb-10 overflow-y-auto">
         <div className="bg-slate-900 border-2 border-slate-700 w-full max-w-xl rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-2xl space-y-4 sm:space-y-6 my-auto">
-          {/* Top Bar trong phòng: Nút Rời phòng / Quay lại Menu */}
+          {/* Top Bar trong phòng: Nút Rời phòng / Quay lại Menu & Nút chuyển ngôn ngữ */}
           <div className="flex items-center justify-between pb-2 border-b border-slate-800">
             <button
               type="button"
@@ -92,18 +111,29 @@ export const Lobby: React.FC<LobbyProps> = ({
               className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-950/70 text-slate-300 hover:text-rose-300 border border-slate-700 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
             >
               <span>←</span>
-              <span>Rời Phòng / Về Menu</span>
+              <span>{lang === 'en' ? 'Leave Room / Menu' : 'Rời Phòng / Về Menu'}</span>
             </button>
-            <span className="text-[11px] text-slate-400 font-medium">
-              {isHost ? '👑 Bạn là Chủ phòng' : '👤 Người chơi'}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-slate-400 font-medium">
+                {isHost 
+                  ? (lang === 'en' ? '👑 You are Host' : '👑 Bạn là Chủ phòng') 
+                  : (lang === 'en' ? '👤 Player' : '👤 Người chơi')}
+              </span>
+              <button
+                type="button"
+                onClick={handleToggleLang}
+                className="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-yellow-300 font-bold text-[10px] border border-slate-700 transition"
+              >
+                {lang === 'en' ? '🇬🇧 EN' : '🇻🇳 VN'}
+              </button>
+            </div>
           </div>
 
           {/* Header Phòng */}
           <div className="text-center space-y-2">
             <span className="text-4xl">💣</span>
             <h2 className="text-2xl sm:text-3xl font-black text-yellow-400">
-              Phòng Chờ: <span className="tracking-widest uppercase text-white bg-slate-800 px-3 py-1 rounded-xl border border-slate-700">{room.id}</span>
+              {lang === 'en' ? 'Lobby:' : 'Phòng Chờ:'} <span className="tracking-widest uppercase text-white bg-slate-800 px-3 py-1 rounded-xl border border-slate-700">{room.id}</span>
             </h2>
 
             {/* Nút sao chép link mời tiện lợi */}
@@ -121,24 +151,30 @@ export const Lobby: React.FC<LobbyProps> = ({
                 }`}
               >
                 <span>{copiedLink ? '✓' : '📋'}</span>
-                <span>{copiedLink ? 'Đã sao chép link!' : 'Sao chép link mời'}</span>
+                <span>
+                  {copiedLink 
+                    ? (lang === 'en' ? 'Copied invite link!' : 'Đã sao chép link!') 
+                    : (lang === 'en' ? 'Copy invite link' : 'Sao chép link mời')}
+                </span>
               </button>
             </div>
             <p className="text-[11px] text-slate-400">
-              Gửi link này cho bạn bè để họ vào thẳng phòng mà không cần gõ mã phòng!
+              {lang === 'en'
+                ? 'Send this link to friends so they can join directly without typing room code!'
+                : 'Gửi link này cho bạn bè để họ vào thẳng phòng mà không cần gõ mã phòng!'}
             </p>
           </div>
 
           {/* Danh sách người chơi trong phòng */}
           <div className="space-y-2">
             <div className="flex justify-between items-center text-xs font-bold text-slate-400">
-              <span>Người chơi đã sẵn sàng ({room.players.length}/10):</span>
+              <span>{lang === 'en' ? 'Players ready' : 'Người chơi đã sẵn sàng'} ({room.players.length}/10):</span>
               {isHost && room.players.length < 10 && (
                 <button
                   onClick={onAddBot}
                   className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-yellow-300 rounded-lg border border-slate-700 transition"
                 >
-                  + Thêm Bot AI
+                  {lang === 'en' ? '+ Add AI Bot' : '+ Thêm Bot AI'}
                 </button>
               )}
             </div>
@@ -157,7 +193,11 @@ export const Lobby: React.FC<LobbyProps> = ({
                   <div className="truncate text-xs">
                     <div className="font-bold truncate">{p.name}</div>
                     <div className="text-[10px] text-slate-500">
-                      {p.id === room.hostId ? 'Chủ phòng (Host)' : p.isBot ? 'AI Bot' : 'Người chơi'}
+                      {p.id === room.hostId 
+                        ? (lang === 'en' ? 'Host' : 'Chủ phòng (Host)') 
+                        : p.isBot 
+                        ? 'AI Bot' 
+                        : (lang === 'en' ? 'Player' : 'Người chơi')}
                     </div>
                   </div>
                 </div>
@@ -171,15 +211,17 @@ export const Lobby: React.FC<LobbyProps> = ({
               <div className="bg-slate-950/80 p-3.5 rounded-2xl border border-slate-800 space-y-3">
                 <div className="flex items-center justify-between text-xs font-black text-slate-300">
                   <span className="flex items-center gap-1.5 text-yellow-400">
-                    <span>⏱️</span> Cài đặt nhịp độ ván đấu
+                    <span>⏱️</span> {lang === 'en' ? 'Match Pace Settings' : 'Cài đặt nhịp độ ván đấu'}
                   </span>
-                  <span className="text-[10px] text-slate-400 font-normal">Dễ theo dõi, không bị quá nhanh</span>
+                  <span className="text-[10px] text-slate-400 font-normal">
+                    {lang === 'en' ? 'Easy to follow, not rushed' : 'Dễ theo dõi, không bị quá nhanh'}
+                  </span>
                 </div>
 
                 {/* 1. Thời gian chờ Nope */}
                 <div>
                   <div className="flex justify-between items-center text-[11px] font-bold text-slate-300 mb-1">
-                    <span>Thời gian chờ phản ứng NOPE:</span>
+                    <span>{lang === 'en' ? 'NOPE reaction window:' : 'Thời gian chờ phản ứng NOPE:'}</span>
                     <span className="text-rose-400 font-mono font-black">{nopeTimeoutSec}s</span>
                   </div>
                   <input
@@ -196,17 +238,17 @@ export const Lobby: React.FC<LobbyProps> = ({
                     className="w-full accent-rose-500 cursor-pointer"
                   />
                   <div className="flex justify-between text-[9px] text-slate-500">
-                    <span>3s (Nhanh)</span>
-                    <span className="text-rose-300/80 font-bold">5s (Khuyên dùng)</span>
-                    <span>10s (Thong thả)</span>
+                    <span>{lang === 'en' ? '3s (Fast)' : '3s (Nhanh)'}</span>
+                    <span className="text-rose-300/80 font-bold">{lang === 'en' ? '5s (Recommended)' : '5s (Khuyên dùng)'}</span>
+                    <span>{lang === 'en' ? '10s (Relaxed)' : '10s (Thong thả)'}</span>
                   </div>
                 </div>
 
                 {/* 2. Tốc độ Bot suy nghĩ */}
                 <div>
                   <div className="flex justify-between items-center text-[11px] font-bold text-slate-300 mb-1">
-                    <span>Thời gian AI Bot suy nghĩ:</span>
-                    <span className="text-emerald-400 font-mono font-black">{botDelaySec}s / lượt</span>
+                    <span>{lang === 'en' ? 'AI Bot think time:' : 'Thời gian AI Bot suy nghĩ:'}</span>
+                    <span className="text-emerald-400 font-mono font-black">{botDelaySec}s / {lang === 'en' ? 'turn' : 'lượt'}</span>
                   </div>
                   <input
                     type="range"
@@ -222,9 +264,9 @@ export const Lobby: React.FC<LobbyProps> = ({
                     className="w-full accent-emerald-500 cursor-pointer"
                   />
                   <div className="flex justify-between text-[9px] text-slate-500">
-                    <span>1s (Chớp nhoáng)</span>
-                    <span className="text-emerald-300/80 font-bold">2s (Dễ nhìn)</span>
-                    <span>4s (Rất chậm)</span>
+                    <span>{lang === 'en' ? '1s (Quick)' : '1s (Chớp nhoáng)'}</span>
+                    <span className="text-emerald-300/80 font-bold">{lang === 'en' ? '2s (Clear)' : '2s (Dễ nhìn)'}</span>
+                    <span>{lang === 'en' ? '4s (Slow)' : '4s (Rất chậm)'}</span>
                   </div>
                 </div>
               </div>
@@ -244,10 +286,10 @@ export const Lobby: React.FC<LobbyProps> = ({
                       ? 'bg-amber-950/80 border-amber-400 text-amber-300'
                       : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-100'
                   }`}
-                  title="Cấu hình số lượng các loại thẻ bài và luật chia bài"
+                  title={lang === 'en' ? 'Configure card counts and deck rules' : 'Cấu hình số lượng các loại thẻ bài và luật chia bài'}
                 >
                   <span>⚙️</span>
-                  <span>Thiết Lập Bộ Bài</span>
+                  <span>{lang === 'en' ? 'Deck Settings' : 'Thiết Lập Bộ Bài'}</span>
                   {room.deckConfig && <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />}
                 </button>
 
@@ -257,12 +299,12 @@ export const Lobby: React.FC<LobbyProps> = ({
                   className="flex-[1.5] py-3.5 px-3 bg-yellow-400 hover:bg-yellow-300 text-slate-950 font-black text-xs sm:text-sm uppercase rounded-2xl shadow-xl shadow-yellow-400/20 transition transform active:scale-95 disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <span>🚀</span>
-                  <span>Bắt Đầu Trận Đấu</span>
+                  <span>{lang === 'en' ? 'Start Match' : 'Bắt Đầu Trận Đấu'}</span>
                 </button>
               </div>
             ) : (
               <div className="text-center text-sm font-semibold text-slate-400 py-3 bg-slate-800/40 rounded-xl border border-slate-700/40 animate-pulse">
-                Đang chờ Chủ phòng bắt đầu ván đấu...
+                {lang === 'en' ? 'Waiting for Host to start match...' : 'Đang chờ Chủ phòng bắt đầu ván đấu...'}
               </div>
             )}
 
@@ -272,7 +314,7 @@ export const Lobby: React.FC<LobbyProps> = ({
               className="w-full py-2 bg-slate-950/70 hover:bg-rose-950/60 text-slate-400 hover:text-rose-300 text-xs font-bold rounded-xl border border-slate-800 transition cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
             >
               <span>🚪</span>
-              <span>Rời khỏi phòng chờ và quay lại Menu chính</span>
+              <span>{lang === 'en' ? 'Leave lobby and return to main menu' : 'Rời khỏi phòng chờ và quay lại Menu chính'}</span>
             </button>
           </div>
         </div>
@@ -291,7 +333,19 @@ export const Lobby: React.FC<LobbyProps> = ({
 
   // Màn hình chính ngoài sảnh
   return (
-    <div className="min-h-[100dvh] w-full bg-slate-950 flex flex-col items-center justify-start sm:justify-center p-3 sm:p-6 py-6 sm:py-10 pb-16 sm:pb-10 overflow-y-auto">
+    <div className="relative min-h-[100dvh] w-full bg-slate-950 flex flex-col items-center justify-start sm:justify-center p-3 sm:p-6 py-6 sm:py-10 pb-16 sm:pb-10 overflow-y-auto">
+      {/* Nút chuyển đổi ngôn ngữ Việt / Anh ở góc trên bên phải */}
+      <div className="absolute top-3 right-3 sm:top-5 sm:right-5 z-20">
+        <button
+          type="button"
+          onClick={handleToggleLang}
+          className="px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-yellow-300 font-black text-xs border border-slate-700 shadow-md flex items-center gap-1.5 transition active:scale-95 cursor-pointer backdrop-blur-md"
+        >
+          <span>{lang === 'en' ? '🇬🇧' : '🇻🇳'}</span>
+          <span>{lang === 'en' ? 'EN' : 'VN'}</span>
+        </button>
+      </div>
+
       <div className="bg-slate-900 border-2 border-slate-800 w-full max-w-md rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-2xl space-y-4 sm:space-y-6 my-auto">
         {/* Logo và tiêu đề */}
         <div className="text-center">
@@ -299,10 +353,10 @@ export const Lobby: React.FC<LobbyProps> = ({
             💣
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-yellow-400 uppercase tracking-wider">
-            MÈO NỔ
+            {lang === 'en' ? 'EXPLODING KITTENS' : 'MÈO NỔ'}
           </h1>
           <p className="text-[11px] sm:text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest">
-            Exploding Kittens Online
+            {lang === 'en' ? 'Multiplayer Party Card Game' : 'Exploding Kittens Online'}
           </p>
         </div>
 
@@ -310,30 +364,30 @@ export const Lobby: React.FC<LobbyProps> = ({
         <div className="flex bg-slate-950 p-1.5 rounded-2xl border border-slate-800">
           <button
             onClick={() => setTab('single')}
-            className={`flex-1 py-2 text-xs font-black uppercase rounded-xl transition ${
+            className={`flex-1 py-2 text-xs font-black uppercase rounded-xl transition cursor-pointer ${
               tab === 'single'
                 ? 'bg-yellow-400 text-slate-950 shadow-md'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            Chơi Đơn vs AI
+            {lang === 'en' ? 'Solo vs AI' : 'Chơi Đơn vs AI'}
           </button>
           <button
             onClick={() => setTab('multi')}
-            className={`flex-1 py-2 text-xs font-black uppercase rounded-xl transition ${
+            className={`flex-1 py-2 text-xs font-black uppercase rounded-xl transition cursor-pointer ${
               tab === 'multi'
                 ? 'bg-yellow-400 text-slate-950 shadow-md'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            Nhiều Người (Online / LAN)
+            {lang === 'en' ? 'Multiplayer (Online / LAN)' : 'Nhiều Người (Online / LAN)'}
           </button>
         </div>
 
         {/* Tên người chơi */}
         <div>
           <label className="text-xs font-bold text-slate-300 block mb-1">
-            Tên của bạn:
+            {lang === 'en' ? 'Your Name:' : 'Tên của bạn:'}
           </label>
           <input
             type="text"
@@ -341,7 +395,7 @@ export const Lobby: React.FC<LobbyProps> = ({
             onChange={e => setPlayerName(e.target.value)}
             maxLength={18}
             className="w-full bg-slate-950 border border-slate-700 px-4 py-2.5 rounded-xl text-sm font-semibold text-white focus:outline-none focus:border-yellow-400 transition"
-            placeholder="Nhập tên người chơi..."
+            placeholder={lang === 'en' ? 'Enter player name...' : 'Nhập tên người chơi...'}
           />
         </div>
 
@@ -350,8 +404,12 @@ export const Lobby: React.FC<LobbyProps> = ({
           <div className="space-y-4 animate-fade-in">
             <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800">
               <div className="flex justify-between items-center text-xs font-bold text-slate-300 mb-2">
-                <span>Tổng số người chơi trên bàn:</span>
-                <span className="text-yellow-400 text-sm">{singlePlayerCount} người (Bạn + {singlePlayerCount - 1} Bot)</span>
+                <span>{lang === 'en' ? 'Total players on table:' : 'Tổng số người chơi trên bàn:'}</span>
+                <span className="text-yellow-400 text-sm">
+                  {lang === 'en' 
+                    ? `${singlePlayerCount} players (You + ${singlePlayerCount - 1} Bots)` 
+                    : `${singlePlayerCount} người (Bạn + ${singlePlayerCount - 1} Bot)`}
+                </span>
               </div>
               <input
                 type="range"
@@ -362,8 +420,8 @@ export const Lobby: React.FC<LobbyProps> = ({
                 className="w-full accent-yellow-400 cursor-pointer"
               />
               <div className="flex justify-between text-[10px] text-slate-500 mt-1">
-                <span>2 người</span>
-                <span>Tối đa 10 người</span>
+                <span>{lang === 'en' ? '2 players' : '2 người'}</span>
+                <span>{lang === 'en' ? 'Up to 10 players' : 'Tối đa 10 người'}</span>
               </div>
             </div>
 
@@ -371,15 +429,17 @@ export const Lobby: React.FC<LobbyProps> = ({
             <div className="bg-slate-950/80 p-3.5 rounded-2xl border border-slate-800 space-y-3">
               <div className="flex items-center justify-between text-xs font-black text-slate-300">
                 <span className="flex items-center gap-1.5 text-yellow-400">
-                  <span>⏱️</span> Cài đặt nhịp độ ván đấu
+                  <span>⏱️</span> {lang === 'en' ? 'Match Pace Settings' : 'Cài đặt nhịp độ ván đấu'}
                 </span>
-                <span className="text-[10px] text-slate-400 font-normal">Dễ theo dõi, không bị quá nhanh</span>
+                <span className="text-[10px] text-slate-400 font-normal">
+                  {lang === 'en' ? 'Easy to follow, not rushed' : 'Dễ theo dõi, không bị quá nhanh'}
+                </span>
               </div>
 
               {/* 1. Thời gian chờ Nope */}
               <div>
                 <div className="flex justify-between items-center text-[11px] font-bold text-slate-300 mb-1">
-                  <span>Thời gian chờ phản ứng NOPE:</span>
+                  <span>{lang === 'en' ? 'NOPE reaction window:' : 'Thời gian chờ phản ứng NOPE:'}</span>
                   <span className="text-rose-400 font-mono font-black">{nopeTimeoutSec}s</span>
                 </div>
                 <input
@@ -392,17 +452,17 @@ export const Lobby: React.FC<LobbyProps> = ({
                   className="w-full accent-rose-500 cursor-pointer"
                 />
                 <div className="flex justify-between text-[9px] text-slate-500">
-                  <span>3s (Nhanh)</span>
-                  <span className="text-rose-300/80 font-bold">5s (Khuyên dùng)</span>
-                  <span>10s (Thong thả)</span>
+                  <span>{lang === 'en' ? '3s (Fast)' : '3s (Nhanh)'}</span>
+                  <span className="text-rose-300/80 font-bold">{lang === 'en' ? '5s (Recommended)' : '5s (Khuyên dùng)'}</span>
+                  <span>{lang === 'en' ? '10s (Relaxed)' : '10s (Thong thả)'}</span>
                 </div>
               </div>
 
               {/* 2. Tốc độ Bot suy nghĩ */}
               <div>
                 <div className="flex justify-between items-center text-[11px] font-bold text-slate-300 mb-1">
-                  <span>Thời gian AI Bot suy nghĩ:</span>
-                  <span className="text-emerald-400 font-mono font-black">{botDelaySec}s / lượt</span>
+                  <span>{lang === 'en' ? 'AI Bot think time:' : 'Thời gian AI Bot suy nghĩ:'}</span>
+                  <span className="text-emerald-400 font-mono font-black">{botDelaySec}s / {lang === 'en' ? 'turn' : 'lượt'}</span>
                 </div>
                 <input
                   type="range"
@@ -414,9 +474,9 @@ export const Lobby: React.FC<LobbyProps> = ({
                   className="w-full accent-emerald-500 cursor-pointer"
                 />
                 <div className="flex justify-between text-[9px] text-slate-500">
-                  <span>1s (Chớp nhoáng)</span>
-                  <span className="text-emerald-300/80 font-bold">2s (Dễ nhìn)</span>
-                  <span>4s (Rất chậm)</span>
+                  <span>{lang === 'en' ? '1s (Quick)' : '1s (Chớp nhoáng)'}</span>
+                  <span className="text-emerald-300/80 font-bold">{lang === 'en' ? '2s (Clear)' : '2s (Dễ nhìn)'}</span>
+                  <span>{lang === 'en' ? '4s (Slow)' : '4s (Rất chậm)'}</span>
                 </div>
               </div>
             </div>
@@ -431,10 +491,10 @@ export const Lobby: React.FC<LobbyProps> = ({
                     ? 'bg-amber-950/80 border-amber-400 text-amber-300'
                     : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-100'
                 }`}
-                title="Cấu hình số lượng các loại thẻ bài và luật chia bài"
+                title={lang === 'en' ? 'Configure card counts and deck rules' : 'Cấu hình số lượng các loại thẻ bài và luật chia bài'}
               >
                 <span>⚙️</span>
-                <span>Thiết Lập Bộ Bài</span>
+                <span>{lang === 'en' ? 'Deck Settings' : 'Thiết Lập Bộ Bài'}</span>
                 {deckConfig && <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />}
               </button>
 
@@ -444,7 +504,7 @@ export const Lobby: React.FC<LobbyProps> = ({
                 className="flex-[1.5] py-3.5 px-3 bg-yellow-400 hover:bg-yellow-300 text-slate-950 font-black text-xs sm:text-sm uppercase rounded-2xl shadow-xl shadow-yellow-400/20 transition transform active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <span>⚡</span>
-                <span>Vào Trận Đấu</span>
+                <span>{lang === 'en' ? 'Enter Match' : 'Vào Trận Đấu'}</span>
               </button>
             </div>
           </div>
@@ -454,7 +514,7 @@ export const Lobby: React.FC<LobbyProps> = ({
         {tab === 'multi' && (
           <div className="space-y-4 animate-fade-in">
             <div className="p-2.5 sm:p-3 bg-emerald-950/30 border border-emerald-800/40 rounded-xl text-[11px] text-emerald-300">
-              📍 Địa chỉ trang web: <strong className="font-mono text-white">{typeof window !== 'undefined' && !window.location.origin.includes('localhost') ? window.location.origin : `http://${lanIp}:3000`}</strong>
+              {lang === 'en' ? '📍 Website Address:' : '📍 Địa chỉ trang web:'} <strong className="font-mono text-white">{typeof window !== 'undefined' && !window.location.origin.includes('localhost') ? window.location.origin : `http://${lanIp}:3000`}</strong>
             </div>
 
             {/* Cụm nút hành động Multiplayer: Thiết lập bộ bài & Tạo phòng mới (Ngang hàng) */}
@@ -467,10 +527,10 @@ export const Lobby: React.FC<LobbyProps> = ({
                     ? 'bg-amber-950/80 border-amber-400 text-amber-300'
                     : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-100'
                 }`}
-                title="Cài đặt bộ bài trước khi tạo phòng"
+                title={lang === 'en' ? 'Configure card counts before hosting' : 'Cài đặt bộ bài trước khi tạo phòng'}
               >
                 <span>⚙️</span>
-                <span>Thiết Lập Bộ Bài</span>
+                <span>{lang === 'en' ? 'Deck Settings' : 'Thiết Lập Bộ Bài'}</span>
                 {deckConfig && <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />}
               </button>
 
@@ -480,13 +540,13 @@ export const Lobby: React.FC<LobbyProps> = ({
                 className="flex-[1.5] py-3.5 px-3 bg-yellow-400 hover:bg-yellow-300 text-slate-950 font-black text-xs sm:text-sm uppercase rounded-2xl shadow-xl shadow-yellow-400/20 transition transform active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <span>🚀</span>
-                <span>Tạo Phòng (Host)</span>
+                <span>{lang === 'en' ? 'Create Room (Host)' : 'Tạo Phòng (Host)'}</span>
               </button>
             </div>
 
             <div className="relative flex py-1 items-center">
               <div className="flex-grow border-t border-slate-800"></div>
-              <span className="flex-shrink mx-4 text-xs text-slate-500 uppercase font-bold">Hoặc</span>
+              <span className="flex-shrink mx-4 text-xs text-slate-500 uppercase font-bold">{lang === 'en' ? 'Or' : 'Hoặc'}</span>
               <div className="flex-grow border-t border-slate-800"></div>
             </div>
 
@@ -495,16 +555,16 @@ export const Lobby: React.FC<LobbyProps> = ({
                 type="text"
                 value={joinRoomCode}
                 onChange={e => setJoinRoomCode(e.target.value.toUpperCase())}
-                placeholder="Nhập mã phòng (VD: 4 ký tự)..."
+                placeholder={lang === 'en' ? 'Enter room code (e.g. 4 letters)...' : 'Nhập mã phòng (VD: 4 ký tự)...'}
                 maxLength={6}
                 className="w-full bg-slate-950 border border-slate-700 px-4 py-2.5 rounded-xl text-center text-sm font-mono tracking-widest font-black uppercase text-white focus:outline-none focus:border-yellow-400 transition"
               />
               <button
                 onClick={() => onJoinMultiplayer(joinRoomCode, playerName)}
                 disabled={!joinRoomCode}
-                className="w-full py-3.5 bg-slate-800 hover:bg-slate-700 text-white font-black text-sm uppercase rounded-2xl border border-slate-700 transition disabled:opacity-50"
+                className="w-full py-3.5 bg-slate-800 hover:bg-slate-700 text-white font-black text-sm uppercase rounded-2xl border border-slate-700 transition disabled:opacity-50 cursor-pointer"
               >
-                Vào Phòng
+                {lang === 'en' ? 'Join Room' : 'Vào Phòng'}
               </button>
             </div>
           </div>

@@ -16,6 +16,7 @@ import { ComboTargetModal } from './ComboTargetModal';
 import { DiscardPileModal } from './DiscardPileModal';
 import { GameLog } from './GameLog';
 import { sound } from '../../engine/audio/SoundEffects';
+import { Language, UI_TEXT } from '../i18n';
 
 interface GameBoardProps {
   state: GameState;
@@ -29,6 +30,8 @@ interface GameBoardProps {
   onPickDiscard: (cardUid: string) => void;
   onCloseSeeFuture: () => void;
   onLeaveGame: () => void;
+  lang?: Language;
+  onToggleLang?: () => void;
 }
 
 export const GameBoard: React.FC<GameBoardProps> = ({
@@ -42,8 +45,25 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   onGiveFavorCard,
   onPickDiscard,
   onCloseSeeFuture,
-  onLeaveGame
+  onLeaveGame,
+  lang: langProp,
+  onToggleLang: onToggleLangProp
 }) => {
+  const [internalLang, setInternalLang] = useState<Language>(() => (typeof window !== 'undefined' ? (localStorage.getItem('ek_lang') as Language || 'vi') : 'vi'));
+  const lang = langProp || internalLang;
+  const handleToggleLang = () => {
+    if (onToggleLangProp) {
+      onToggleLangProp();
+    } else {
+      const nextLang: Language = lang === 'vi' ? 'en' : 'vi';
+      setInternalLang(nextLang);
+      if (typeof window !== 'undefined') localStorage.setItem('ek_lang', nextLang);
+    }
+  };
+  const t = <K extends keyof typeof UI_TEXT.vi>(key: K): (typeof UI_TEXT.vi)[K] => {
+    return (UI_TEXT[lang] as typeof UI_TEXT.vi)[key];
+  };
+
   const [showDiscardModal, setShowDiscardModal] = useState<boolean>(false);
   const [comboTargetModalData, setComboTargetModalData] = useState<{
     mode: 'FAVOR_TARGET' | 'COMBO_TWO' | 'COMBO_THREE';
@@ -572,14 +592,14 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       <FlyingCardOverlay tasks={flyingTasks} onCompleteTask={handleCompleteFlyingTask} />
 
       {/* SPOTLIGHT PHÓNG TO THẺ BÀI VỪA ĐÁNH GIỮA SÂN */}
-      <ActionSpotlight data={spotlightData} />
+      <ActionSpotlight data={spotlightData} lang={lang} />
 
       {/* 1. Header (Cố định h-10 sm:h-11) */}
       <div className="h-10 sm:h-11 flex-shrink-0 flex items-center justify-between bg-slate-900/90 border border-slate-800 px-3 py-1 rounded-xl shadow-md backdrop-blur-md z-30">
         <div className="flex items-center gap-1.5">
           <span className="text-base sm:text-lg">💣</span>
           <h2 className="font-black text-xs sm:text-sm text-yellow-400">
-            MÈO NỔ
+            {t('gameTitle')}
           </h2>
           <span className="text-[10px] text-slate-400 font-mono hidden sm:inline ml-1">
             [{state.id}]
@@ -589,27 +609,36 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         <div className="flex items-center gap-2">
           {/* Lượt hiện tại */}
           <div className="flex items-center gap-1 text-xs">
-            <span className="text-slate-400 text-[10px] sm:text-[11px] hidden md:inline">Lượt:</span>
+            <span className="text-slate-400 text-[10px] sm:text-[11px] hidden md:inline">{t('turnLabel')}</span>
             <span className="font-black text-yellow-400 bg-slate-800 px-2 py-0.5 rounded-lg border border-slate-700 text-[10px] sm:text-xs">
               {currentPlayer?.name} {currentPlayer?.turnsToTake > 1 ? `(${currentPlayer.turnsToTake}L)` : ''}
             </span>
           </div>
 
-          {/* Số bài trên tay của bạn (hiển thị tiện lợi ngay trên header ở mobile để không bao giờ bị đè) */}
+          {/* Số bài trên tay của bạn */}
           {myPlayer && (
             <div className="flex items-center gap-1 bg-slate-800/90 border border-slate-700 px-2 py-0.5 rounded-lg text-[10px] sm:text-xs font-bold text-slate-200">
               <span>🎴</span>
               <span className="text-yellow-400 font-black">{myPlayer.hand.length}</span>
-              <span className="text-slate-400 hidden xs:inline">lá</span>
+              <span className="text-slate-400 hidden xs:inline">{t('cardsCount')}</span>
             </div>
           )}
         </div>
 
         <div className="flex items-center gap-1.5 text-xs">
+          {/* Nút chuyển đổi ngôn ngữ Song ngữ Việt - Anh */}
+          <button
+            onClick={handleToggleLang}
+            className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-black text-[10px] sm:text-[11px] transition cursor-pointer flex items-center gap-1 active:scale-95"
+            title={lang === 'vi' ? 'Switch to English' : 'Chuyển sang Tiếng Việt'}
+          >
+            <span>{lang === 'vi' ? '🇻🇳 VN' : '🇬🇧 EN'}</span>
+          </button>
+
           <button
             onClick={() => sound.toggleMute()}
             className="p-1 px-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition text-[11px]"
-            title="Bật/Tắt Âm thanh"
+            title={sound.getMuted() ? t('unmute') : t('mute')}
           >
             {sound.getMuted() ? '🔇' : '🔊'}
           </button>
@@ -617,7 +646,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             onClick={handleLeaveButtonClick}
             className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-rose-950/60 text-slate-300 hover:text-rose-300 border border-slate-700 transition font-bold text-[11px]"
           >
-            Rời Bàn
+            {t('leaveTable')}
           </button>
         </div>
       </div>
@@ -628,61 +657,35 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           pendingAction={state.pendingAction}
           currentPlayer={myPlayer}
           onPassNope={onPassNope}
+          lang={lang}
         />
-      )}
-
-      {/* 2.1 Banner Báo Động Khẩn Cấp khi đối thủ rút phải Mèo Nổ */}
-      {state.pendingAction?.type === 'DEFUSE_INSERTION' && state.pendingAction.initiatorId !== myPlayerId && (
-        <div className="fixed top-12 left-1/2 -translate-x-1/2 z-50 w-[92vw] max-w-sm sm:max-w-md animate-fade-in pointer-events-none">
-          <div className="bg-rose-950/95 border-2 border-rose-500 rounded-2xl p-2.5 sm:p-3 shadow-2xl shadow-rose-950/90 backdrop-blur-md flex items-center gap-2.5 sm:gap-3">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-rose-600/90 border-2 border-rose-400 flex items-center justify-center text-xl sm:text-2xl flex-shrink-0 animate-bounce">
-              💣
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] sm:text-xs font-black text-rose-300 uppercase tracking-wide">
-                  ⚠️ BÁO ĐỘNG MÈO NỔ!
-                </span>
-                <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
-              </div>
-              <div className="text-xs sm:text-sm font-black text-white truncate">
-                <span className="text-yellow-400 font-extrabold">{state.players.find(p => p.id === state.pendingAction?.initiatorId)?.name || 'Đối thủ'}</span> vừa rút phải MÈO NỔ!
-              </div>
-              <div className="text-[9px] sm:text-[10px] text-rose-200/80 font-medium truncate">
-                {state.players.find(p => p.id === state.pendingAction?.initiatorId)?.isBot ? 'Bot đang dùng lá Gỡ Bom (Defuse) để cứu mạng...' : 'Đang chờ người chơi dùng lá Gỡ Bom (Defuse)...'}
-              </div>
-            </div>
-          </div>
-        </div>
       )}
 
       {/* 3. SÀN ĐẤU BÀI TẬP TRUNG (UNIFIED GAME TABLE MAT)
           - Tích hợp đối thủ phân bố vòng cung nhẹ nhàng, tự nhiên
-          - Tự động co giãn theo 100% bề ngang màn hình mobile / desktop (không cuộn ngang, không hộp riêng)
-          - Người đến lượt tự động sáng hào quang rực rỡ
+          - Dynamic Scale: Trên mobile, người đến lượt phình to ra để đọc rõ tên; trên PC mở rộng thoải mái
       */}
       <div className="flex-1 min-h-0 relative flex flex-col justify-between items-center w-full px-2 sm:px-4 py-1 overflow-visible">
         {/* VÒNG ĐỐI THỦ PHÂN BỐ CUNG TRÒN TỰ CO GIÃN THEO BỀ NGANG MÀN HÌNH (KHÔNG HỘP, KHÔNG CUỘN) */}
-        <div className="w-full max-w-4xl flex justify-center items-center gap-1 sm:gap-2 px-1 sm:px-3 pt-1 pb-2 z-20 overflow-visible">
+        <div className="w-full max-w-5xl flex justify-center items-center gap-1 sm:gap-2 px-1 sm:px-3 pt-1 pb-2 z-20 overflow-visible">
           {opponents.map((opp, idx) => {
             const isTurn = state.status === 'playing' && currentPlayer?.id === opp.id;
             const isDefusing = state.pendingAction?.type === 'DEFUSE_INSERTION' && state.pendingAction.initiatorId === opp.id;
+            const isActive = isTurn || isDefusing;
             const totalOpp = opponents.length;
             const mid = (totalOpp - 1) / 2;
-            const t = totalOpp > 1 ? (idx - mid) / mid : 0;
+            const tVal = totalOpp > 1 ? (idx - mid) / mid : 0;
 
-            // Uốn cong hình vòng cung nhẹ nhàng, tự nhiên không bị sâu quá trên màn hình nhỏ
-            const arcY = Math.pow(Math.abs(t), 1.6) * (totalOpp > 4 ? 8 : 14);
-            const arcRotate = t * 6;
+            // Uốn cong hình vòng cung nhẹ nhàng
+            const arcY = Math.pow(Math.abs(tVal), 1.6) * (totalOpp > 4 ? 8 : 14);
+            const arcRotate = tVal * 6;
 
-            // Tự co giãn theo tỉ lệ bề ngang màn hình:
-            const maxWClass = totalOpp <= 2
-              ? 'max-w-[120px]'
-              : totalOpp <= 4
-              ? 'max-w-[90px]'
-              : totalOpp <= 6
-              ? 'max-w-[68px]'
-              : 'max-w-[50px]';
+            // Tự co giãn dynamic:
+            // Trên màn hình nhỏ: Người đến lượt phình to ra (flex-[2.4] min-w-[96px]), người không đến lượt thu gọn (max-w-[48px]).
+            // Trên PC (sm trở lên): Mọi người chơi đều rộng rãi (sm:min-w-[90px] sm:max-w-[145px]) để đọc rõ tên không bao giờ bị cắt.
+            const dynamicSizeClass = isActive
+              ? 'flex-[2.4] xs:flex-[2] sm:flex-1 min-w-[96px] xs:min-w-[110px] sm:min-w-[95px] md:min-w-[115px] max-w-[130px] sm:max-w-[155px] md:max-w-[175px] z-30 scale-105 shadow-2xl'
+              : 'flex-1 min-w-0 max-w-[48px] xs:max-w-[62px] sm:min-w-[85px] md:min-w-[105px] sm:max-w-[135px] md:max-w-[155px]';
 
             return (
               <div
@@ -691,11 +694,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                 style={{
                   transform: `translateY(${arcY}px) rotate(${arcRotate}deg)`
                 }}
-                className={`flex-1 min-w-0 ${maxWClass} rounded-xl sm:rounded-2xl flex flex-col items-center justify-between border transition-all duration-300 origin-center py-1 sm:py-2 px-0.5 sm:px-1.5 ${
+                className={`${dynamicSizeClass} rounded-xl sm:rounded-2xl flex flex-col items-center justify-between border transition-all duration-300 origin-center py-1 sm:py-2 px-1 sm:px-2 ${
                   isDefusing
-                    ? 'scale-110 sm:scale-115 z-40 ring-4 ring-rose-500 shadow-[0_0_35px_rgba(244,63,94,1)] bg-rose-950 border-rose-400 animate-bounce-short'
+                    ? 'ring-4 ring-rose-500 shadow-[0_0_35px_rgba(244,63,94,1)] bg-rose-950 border-rose-400 animate-bounce-short'
                     : isTurn
-                    ? 'scale-105 sm:scale-110 z-30 ring-2 sm:ring-4 ring-yellow-400 shadow-[0_0_20px_rgba(250,204,21,0.6)] bg-yellow-950/70 border-yellow-400'
+                    ? 'ring-2 sm:ring-4 ring-yellow-400 shadow-[0_0_20px_rgba(250,204,21,0.6)] bg-yellow-950/70 border-yellow-400'
                     : 'bg-slate-900/80 border-slate-800/80 hover:border-slate-700 backdrop-blur-sm'
                 } ${
                   !opp.isAlive ? 'bg-rose-950/20 border-rose-900/40 opacity-40 grayscale' : ''
@@ -716,27 +719,31 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                   ) : null}
                 </div>
 
-                <div className="text-center w-full min-w-0 px-0.5">
-                  <div className="text-[8px] sm:text-[10px] md:text-[11px] font-black truncate text-slate-100 max-w-full">
+                <div className="text-center w-full min-w-0 px-1 py-0.5">
+                  <div className={`font-black text-slate-100 ${
+                    isActive
+                      ? 'text-[9px] xs:text-[10px] sm:text-[11.5px]'
+                      : 'text-[7px] xs:text-[8px] sm:text-[10.5px]'
+                  } truncate w-full`}>
                     {opp.name}
                   </div>
-                  <div className="text-[7px] sm:text-[9px] text-slate-400 font-bold whitespace-nowrap">
-                    {opp.isAlive ? `🎴 ${opp.hand.length} lá` : 'NỔ 💥'}
+                  <div className="text-[7px] sm:text-[9px] text-slate-400 font-bold whitespace-nowrap mt-0.5">
+                    {opp.isAlive ? `🎴 ${opp.hand.length} ${t('cardsCount')}` : t('explodedTag')}
                   </div>
                 </div>
 
                 {/* Trạng thái lượt đi, rút bom hoặc mất mạng */}
                 {isDefusing ? (
-                  <span className="text-[6px] sm:text-[7.5px] uppercase font-black px-1.5 py-0.2 rounded-full bg-rose-600 text-white shadow-lg animate-pulse whitespace-nowrap truncate max-w-full flex items-center justify-center gap-0.5 border border-rose-300">
-                    <span>💣</span> RÚT BOM!
+                  <span className="text-[6px] sm:text-[7.5px] uppercase font-black px-1.5 py-0.5 rounded-full bg-rose-600 text-white shadow-lg animate-pulse whitespace-nowrap truncate max-w-full flex items-center justify-center gap-0.5 border border-rose-300 my-0.5">
+                    <span>💣</span> {t('bombTag')}
                   </span>
                 ) : opp.disconnected && opp.isAlive ? (
-                  <span className="text-[6px] sm:text-[7.5px] uppercase font-black px-1 py-0.2 rounded-full bg-rose-600/90 text-white animate-pulse flex items-center gap-0.5 whitespace-nowrap truncate max-w-full">
-                    <span>📶</span> AI
+                  <span className="text-[6px] sm:text-[7.5px] uppercase font-black px-1.5 py-0.5 rounded-full bg-rose-600/90 text-white animate-pulse flex items-center gap-0.5 whitespace-nowrap truncate max-w-full my-0.5">
+                    <span>📶</span> {t('aiTag')}
                   </span>
                 ) : isTurn ? (
-                  <span className="text-[6px] sm:text-[7.5px] uppercase font-black px-1 py-0.2 rounded-full bg-yellow-400 text-slate-950 shadow-sm animate-pulse whitespace-nowrap truncate max-w-full">
-                    Đi {opp.turnsToTake > 1 ? `(${opp.turnsToTake}L)` : ''}
+                  <span className="text-[6px] sm:text-[7.5px] uppercase font-black px-1.5 py-0.5 rounded-full bg-yellow-400 text-slate-950 shadow-sm animate-pulse whitespace-nowrap truncate max-w-full my-0.5">
+                    {t('isTurnTag')} {opp.turnsToTake > 1 ? `(${opp.turnsToTake}L)` : ''}
                   </span>
                 ) : null}
               </div>
@@ -818,17 +825,17 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                     type="button"
                     className="w-full py-1.5 bg-yellow-400 hover:bg-yellow-300 text-slate-950 font-black text-[10px] uppercase rounded-lg shadow-lg transition"
                   >
-                    RÚT BÀI (Hết Lượt)
+                    {lang === 'en' ? 'DRAW (End Turn)' : 'RÚT BÀI (Hết Lượt)'}
                   </button>
                 ) : (
                   <span className="text-[9px] text-slate-500 uppercase font-semibold">
-                    {isMyTurn ? 'Đang giải quyết' : 'Chờ tới lượt'}
+                    {isMyTurn ? (lang === 'en' ? 'Resolving...' : 'Đang giải quyết') : (lang === 'en' ? 'Waiting turn' : 'Chờ tới lượt')}
                   </span>
                 )}
               </div>
 
               <span className="h-4 mt-2 text-[10px] text-slate-400 font-semibold flex items-center justify-center leading-none">
-                Còn {state.drawPile.length} lá
+                {t('remainingCards').replace('{n}', state.drawPile.length.toString())}
               </span>
             </div>
 
@@ -849,8 +856,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           <div className="flex items-center gap-1.5 bg-slate-900/70 border border-slate-700/50 px-3 py-1 rounded-full backdrop-blur-md shadow-md">
             <span className="text-xs">🎴</span>
             <span className="text-[10px] sm:text-[11px] font-bold text-slate-200">
-              Bài của bạn ({myPlayer?.name}):{' '}
-              <strong className="text-yellow-400 font-black">{myPlayer?.hand.length || 0} lá</strong>
+              {t('yourHandTitle')} ({myPlayer?.name}):{' '}
+              <strong className="text-yellow-400 font-black">{myPlayer?.hand.length || 0} {t('cardsCount')}</strong>
             </span>
           </div>
         </div>
@@ -863,13 +870,13 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                 💀💥
               </div>
               <h3 className="text-xl sm:text-2xl font-black text-rose-400 uppercase tracking-widest drop-shadow">
-                BẠN ĐÃ BỊ NỔ TUNG!
+                {t('spectatorDefeated')}
               </h3>
               <div className="my-1.5 px-3 py-0.5 rounded-full bg-rose-600/40 border border-rose-400/60 text-white text-[10px] sm:text-[11px] font-black uppercase tracking-wider">
-                BẠN ĐÃ THUA - ĐÃ BỊ LOẠI KHỎI TRẬN ĐẤU
+                {t('spectatorBadge')}
               </div>
               <p className="text-[10px] sm:text-xs text-rose-200/90 leading-relaxed max-w-xs">
-                Bạn đã rút phải Mèo Nổ mà không có lá Gỡ Bom. Bạn đang ở <strong>Chế độ Khán giả (Spectator)</strong> để tiếp tục theo dõi diễn biến trận đấu.
+                {t('spectatorText')}
               </p>
             </div>
           </div>
@@ -888,6 +895,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               onPlayComboThree={handlePlayComboThree}
               onPlayComboFive={handlePlayComboFive}
               onPlayNope={handlePlayNope}
+              lang={lang}
               disabled={!myPlayer.isAlive || (state.pendingAction !== null && state.pendingAction.type !== 'NOPE_WINDOW' && state.pendingAction.type !== 'FAVOR_GIVE_CARD')}
             />
           </div>
@@ -901,15 +909,15 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in select-none">
           <div className="bg-slate-900 border-4 border-rose-500 rounded-3xl p-6 sm:p-8 max-w-sm sm:max-w-md w-full text-center space-y-4 shadow-2xl shadow-rose-950/80 animate-fade-in">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/20 border border-rose-500/60 text-rose-300 text-xs font-black uppercase tracking-wider animate-pulse">
-              <span>⚠️ BÁO ĐỘNG NGUY HIỂM!</span>
+              <span>{lang === 'en' ? '⚠️ DANGER ALERT!' : '⚠️ BÁO ĐỘNG NGUY HIỂM!'}</span>
             </div>
 
             <div>
               <h3 className="text-xl sm:text-2xl font-black text-rose-400 uppercase tracking-wide">
-                BẠN VỪA RÚT PHẢI MÈO NỔ!
+                {lang === 'en' ? 'YOU DREW AN EXPLODING KITTEN!' : 'BẠN VỪA RÚT PHẢI MÈO NỔ!'}
               </h3>
               <p className="text-xs text-slate-400 mt-1">
-                Một quả bom Mèo Nổ vừa chui vào tay bạn!
+                {lang === 'en' ? 'A ticking kitten bomb is in your hand!' : 'Một quả bom Mèo Nổ vừa chui vào tay bạn!'}
               </p>
             </div>
 
@@ -919,6 +927,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                 <CardView
                   card={{ uid: 'drawn_kitten_reveal', defId: 'exploding_kitten' }}
                   isSelected={false}
+                  lang={lang}
                 />
               </div>
             </div>
@@ -927,10 +936,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             <div className="bg-emerald-950/70 border border-emerald-500/60 rounded-2xl p-3 text-left space-y-1">
               <div className="flex items-center gap-1.5 text-emerald-300 font-black text-xs sm:text-sm">
                 <span>🔧</span>
-                <span>ĐÃ TỰ ĐỘNG DÙNG 1 LÁ GỠ BOM (DEFUSE)!</span>
+                <span>{lang === 'en' ? 'AUTO-USED 1 DEFUSE CARD!' : 'ĐÃ TỰ ĐỘNG DÙNG 1 LÁ GỠ BOM (DEFUSE)!'}</span>
               </div>
               <p className="text-[11px] sm:text-xs text-slate-300 leading-relaxed">
-                May mắn thay, bạn có lá <strong>Defuse</strong> trên tay nên đã thoát chết trong gang tấc! Bây giờ, hãy bí mật chọn vị trí để giấu lại Mèo Nổ vào bộ bài.
+                {lang === 'en' 
+                  ? 'Luckily, you had a Defuse in hand and escaped alive! Now, secretly choose where to reinsert the Exploding Kitten into the deck.' 
+                  : 'May mắn thay, bạn có lá Defuse trên tay nên đã thoát chết trong gang tấc! Bây giờ, hãy bí mật chọn vị trí để giấu lại Mèo Nổ vào bộ bài.'}
               </p>
             </div>
 
@@ -942,7 +953,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               }}
               className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-black text-xs sm:text-sm uppercase rounded-2xl shadow-xl shadow-emerald-500/30 transition transform active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
             >
-              <span>CHỌN VỊ TRÍ ĐẶT LẠI MÈO NỔ</span>
+              <span>{lang === 'en' ? 'CHOOSE INSERTION POSITION' : 'CHỌN VỊ TRÍ ĐẶT LẠI MÈO NỔ'}</span>
               <span className="text-base">➔</span>
             </button>
           </div>
@@ -1001,12 +1012,14 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             </div>
             <div>
               <h3 className="text-2xl sm:text-3xl font-black text-yellow-400 uppercase tracking-wider">
-                {state.winnerId === myPlayerId ? 'BẠN ĐÃ CHIẾN THẮNG!' : 'TRẬN ĐẤU KẾT THÚC!'}
+                {state.winnerId === myPlayerId 
+                  ? (lang === 'en' ? 'YOU WON!' : 'BẠN ĐÃ CHIẾN THẮNG!') 
+                  : (lang === 'en' ? 'GAME OVER!' : 'TRẬN ĐẤU KẾT THÚC!')}
               </h3>
               <p className="text-xs sm:text-sm text-slate-300 mt-2">
-                Người chiến thắng duy nhất:{' '}
+                {lang === 'en' ? 'Sole Winner:' : 'Người chiến thắng duy nhất:'}{' '}
                 <strong className="text-yellow-400 text-sm sm:text-base">
-                  {state.players.find(p => p.id === state.winnerId)?.name || 'Không có ai'}
+                  {state.players.find(p => p.id === state.winnerId)?.name || (lang === 'en' ? 'None' : 'Không có ai')}
                 </strong>
               </p>
             </div>
@@ -1014,7 +1027,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               onClick={onLeaveGame}
               className="w-full py-3 bg-yellow-400 hover:bg-yellow-300 text-slate-950 font-black text-base rounded-2xl shadow-xl transition transform active:scale-95"
             >
-              Trở Về Menu Chính 🏠
+              {lang === 'en' ? 'Back to Main Menu 🏠' : 'Trở Về Menu Chính 🏠'}
             </button>
           </div>
         </div>
@@ -1026,17 +1039,19 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           <div className="bg-slate-900 border-4 border-slate-700 w-full max-w-sm rounded-3xl p-6 shadow-2xl text-center space-y-4">
             <div className="text-4xl animate-bounce">🚪</div>
             <h3 className="text-lg sm:text-xl font-black text-white">
-              Xác Nhận Rời Trận Đấu?
+              {lang === 'en' ? 'Confirm Leave Match?' : 'Xác Nhận Rời Trận Đấu?'}
             </h3>
             <p className="text-xs text-slate-300 leading-relaxed">
-              Trận đấu đang diễn ra và bạn vẫn còn sống. Nếu rời bàn lúc này, <strong>Bot AI</strong> sẽ tự động tiếp quản nhân vật của bạn để các người chơi khác tiếp tục trận đấu bình thường.
+              {lang === 'en' 
+                ? 'The game is in progress and you are still alive. If you leave now, AI Bot will take over so others can continue playing.' 
+                : 'Trận đấu đang diễn ra và bạn vẫn còn sống. Nếu rời bàn lúc này, Bot AI sẽ tự động tiếp quản nhân vật của bạn để các người chơi khác tiếp tục trận đấu bình thường.'}
             </p>
             <div className="flex gap-2 pt-2">
               <button
                 onClick={() => setShowLeaveConfirmModal(false)}
                 className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition cursor-pointer"
               >
-                Ở Lại Chơi Tiếp
+                {lang === 'en' ? 'Stay & Play' : 'Ở Lại Chơi Tiếp'}
               </button>
               <button
                 onClick={() => {
@@ -1045,7 +1060,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                 }}
                 className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs transition cursor-pointer shadow-lg shadow-rose-600/30"
               >
-                Xác Nhận Rời Bàn
+                {lang === 'en' ? 'Confirm Leave' : 'Xác Nhận Rời Bàn'}
               </button>
             </div>
           </div>

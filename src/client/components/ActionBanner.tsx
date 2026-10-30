@@ -3,22 +3,29 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { PendingAction, PlayerState } from '../../engine/types';
 import { CardRegistry } from '../../engine/CardRegistry';
 import { sound } from '../../engine/audio/SoundEffects';
+import { Language, UI_TEXT, CARD_I18N } from '../i18n';
 
 interface ActionBannerProps {
   pendingAction: PendingAction;
   currentPlayer: PlayerState;
   onPassNope: () => void;
+  lang?: Language;
 }
 
 export const ActionBanner: React.FC<ActionBannerProps> = ({
   pendingAction,
   currentPlayer,
-  onPassNope
+  onPassNope,
+  lang = 'vi'
 }) => {
   const [timeLeft, setTimeLeft] = useState<number>(3.5);
+  const t = UI_TEXT[lang];
 
   const cardPlayed = pendingAction.cardsPlayed[0];
   const cardDef = cardPlayed ? CardRegistry.getCard(cardPlayed.defId) : null;
+  const cardName = cardDef 
+    ? (CARD_I18N[cardDef.id]?.[lang]?.name || (lang === 'en' ? cardDef.name : cardDef.nameVi)) 
+    : 'Combo';
   const isNegated = pendingAction.nopeCount % 2 === 1;
   const hasNopeInHand = currentPlayer.hand.some(c => c.defId === 'nope');
   const hasPassed = pendingAction.passedPlayerIds.includes(currentPlayer.id);
@@ -54,12 +61,12 @@ export const ActionBanner: React.FC<ActionBannerProps> = ({
             <span className="text-sm sm:text-base animate-pulse flex-shrink-0">⚡</span>
             <div className="min-w-0 truncate">
               <span className="text-slate-400 font-semibold text-[9px] sm:text-[10px] hidden sm:block">
-                Hành động đang chờ:
+                {lang === 'en' ? 'Pending action:' : 'Hành động đang chờ:'}
               </span>
               <span className="font-black text-white text-xs truncate flex items-center gap-1">
-                <span className="text-slate-400 text-[10px] sm:hidden">Chờ Nope:</span>
+                <span className="text-slate-400 text-[10px] sm:hidden">{t.waitingNope}</span>
                 <span>{cardDef?.icon}</span>
-                <span className="text-yellow-300 font-bold truncate">{cardDef?.nameVi || 'Combo'}</span>
+                <span className="text-yellow-300 font-bold truncate">{cardName}</span>
               </span>
             </div>
           </div>
@@ -79,7 +86,7 @@ export const ActionBanner: React.FC<ActionBannerProps> = ({
                   : 'bg-rose-900/60 hover:bg-rose-800 text-rose-200 border border-rose-600/70 active:scale-95 cursor-pointer'
               }`}
             >
-              {hasPassed ? 'Đã Pass ✓' : 'Bỏ qua'}
+              {hasPassed ? t.passedNope : t.passNope}
             </button>
           </div>
         </div>
@@ -95,15 +102,17 @@ export const ActionBanner: React.FC<ActionBannerProps> = ({
         {/* Trạng thái hiện tại & Lời nhắc */}
         <div className="flex items-center justify-between text-[8px] sm:text-[9px] font-bold">
           <span className={isNegated ? 'text-rose-400' : 'text-emerald-400'}>
-            {isNegated ? '🛑 ĐANG BỊ NOPE!' : '✅ ĐANG CÓ HIỆU LỰC'}
+            {isNegated 
+              ? (lang === 'en' ? '🛑 BEING NOPED!' : '🛑 ĐANG BỊ NOPE!') 
+              : (lang === 'en' ? '✅ ACTIVE' : '✅ ĐANG CÓ HIỆU LỰC')}
           </span>
           {hasNopeInHand && !hasPassed ? (
             <span className="text-rose-300 animate-pulse font-extrabold truncate ml-1">
-              👉 Bấm [ĐÁNH NOPE] trên bài bạn!
+              {lang === 'en' ? '👉 Tap [PLAY NOPE] on card!' : '👉 Bấm [ĐÁNH NOPE] trên bài bạn!'}
             </span>
           ) : (
             <span className="text-slate-500 hidden sm:inline">
-              (Không có bài Nope)
+              {lang === 'en' ? '(No Nope cards)' : '(Không có bài Nope)'}
             </span>
           )}
         </div>
