@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import confetti from 'canvas-confetti';
 import { GameState, PlayerState, CardInstance } from '../../engine/types';
 import { CardRegistry } from '../../engine/CardRegistry';
@@ -129,7 +129,27 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   const myPlayer = state.players.find(p => p.id === myPlayerId);
   const currentPlayer = state.players[state.currentPlayerIndex];
   const isMyTurn = state.status === 'playing' && currentPlayer?.id === myPlayerId;
-  const opponents = state.players.filter(p => p.id !== myPlayerId);
+
+  // Sắp xếp danh sách đối thủ theo góc nhìn bàn tròn (Circular Table View) tính từ người đi ngay sau bạn:
+  // - Vị trí ngoài cùng bên trái: người đi ngay sau lượt của bạn.
+  // - Lần lượt vòng qua giữa theo chiều kim đồng hồ.
+  // - Vị trí ngoài cùng bên phải: người đi ngay trước lượt của bạn.
+  // Nhờ đó, bất kể game bị random vị trí ngồi ra sao thì vòng lượt trên màn hình luôn đi mượt mà từ trái qua phải,
+  // và khi người ngoài cùng bên phải đánh xong thì luôn ĐẾN LƯỢT BẠN!
+  const opponents = useMemo(() => {
+    const total = state.players.length;
+    const myIdx = state.players.findIndex(p => p.id === myPlayerId);
+    if (myIdx === -1) {
+      return state.players.filter(p => p.id !== myPlayerId);
+    }
+    const ordered: PlayerState[] = [];
+    for (let i = 1; i < total; i++) {
+      const idx = (myIdx + i) % total;
+      ordered.push(state.players[idx]);
+    }
+    return ordered;
+  }, [state.players, myPlayerId]);
+
   const aliveOpponents = opponents.filter(p => p.isAlive);
 
   // Theo dõi sự thay đổi trên tay mình để phát hiện chính xác lá bài nào bị cướp
