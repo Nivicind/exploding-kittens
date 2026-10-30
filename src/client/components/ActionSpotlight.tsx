@@ -15,6 +15,8 @@ interface ActionSpotlightProps {
 }
 
 export const ActionSpotlight: React.FC<ActionSpotlightProps> = ({ data }) => {
+  const isExplosion = data?.cards[0]?.defId === 'exploding_kitten' || data?.comboTitle?.includes('NỔ');
+
   return (
     <AnimatePresence>
       {data && (
@@ -30,22 +32,35 @@ export const ActionSpotlight: React.FC<ActionSpotlightProps> = ({ data }) => {
             <motion.div
               initial={{ y: -20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
-              className="bg-slate-900/95 border-2 border-yellow-400 px-5 py-2 rounded-2xl shadow-2xl shadow-yellow-500/30 text-center mb-3 backdrop-blur-md"
+              className={`px-5 py-2.5 rounded-2xl shadow-2xl text-center mb-3 backdrop-blur-md border-2 ${
+                isExplosion
+                  ? 'bg-rose-950/95 border-rose-500 shadow-rose-600/60 ring-4 ring-rose-500/40'
+                  : 'bg-slate-900/95 border-yellow-400 shadow-yellow-500/30'
+              }`}
             >
-              <div className="text-[11px] font-bold text-yellow-400 uppercase tracking-widest">
-                ⚡ HÀNH ĐỘNG VỪA KÍCH HOẠT
+              <div className={`text-[11px] font-bold uppercase tracking-widest flex items-center justify-center gap-1.5 ${
+                isExplosion ? 'text-rose-400 animate-pulse' : 'text-yellow-400'
+              }`}>
+                <span>{isExplosion ? '💣 BÁO ĐỘNG MÈO NỔ!' : '⚡ HÀNH ĐỘNG VỪA KÍCH HOẠT'}</span>
               </div>
               <div className="text-base sm:text-lg font-black text-white mt-0.5">
-                <span className="text-yellow-300">{data.playerName}</span> vừa đánh{' '}
-                <span className="text-rose-400">{data.comboTitle || CardRegistry.getCard(data.cards[0]?.defId)?.nameVi}!</span>
+                <span className="text-yellow-300">{data.playerName}</span>{' '}
+                {isExplosion ? 'vừa rút phải ' : 'vừa đánh '}
+                <span className={isExplosion ? 'text-rose-400 font-black' : 'text-rose-400'}>
+                  {data.comboTitle || CardRegistry.getCard(data.cards[0]?.defId)?.nameVi}!
+                </span>
               </div>
             </motion.div>
 
             {/* Thẻ bài được phóng to với vầng hào quang rực rỡ */}
             <motion.div
-              animate={{ rotate: [-2, 2, 0] }}
-              transition={{ repeat: Infinity, duration: 1.5, ease: 'easeInOut' }}
-              className="relative filter drop-shadow-[0_20px_40px_rgba(0,0,0,0.8)]"
+              animate={{ rotate: isExplosion ? [-4, 4, -4] : [-2, 2, 0] }}
+              transition={{ repeat: Infinity, duration: isExplosion ? 0.6 : 1.5, ease: 'easeInOut' }}
+              className={`relative filter ${
+                isExplosion
+                  ? 'drop-shadow-[0_0_50px_rgba(244,63,94,0.9)] scale-110'
+                  : 'drop-shadow-[0_20px_40px_rgba(0,0,0,0.8)]'
+              }`}
             >
               <div className="flex gap-2">
                 {data.cards.map((card, idx) => (

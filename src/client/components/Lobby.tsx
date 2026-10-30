@@ -21,6 +21,7 @@ interface LobbyProps {
   onStartGame: () => void;
   onUpdateDeckConfig: (config: CustomDeckConfig) => void;
   onUpdateSettings?: (settings: GameSettings) => void;
+  onLeaveRoom?: () => void;
 }
 
 export const Lobby: React.FC<LobbyProps> = ({
@@ -33,7 +34,8 @@ export const Lobby: React.FC<LobbyProps> = ({
   onAddBot,
   onStartGame,
   onUpdateDeckConfig,
-  onUpdateSettings
+  onUpdateSettings,
+  onLeaveRoom
 }) => {
   const [tab, setTab] = useState<'single' | 'multi'>('single');
   const [playerName, setPlayerName] = useState<string>('Tôi');
@@ -82,6 +84,21 @@ export const Lobby: React.FC<LobbyProps> = ({
     return (
       <div className="min-h-[100dvh] w-full bg-slate-950 flex flex-col items-center justify-start sm:justify-center p-3 sm:p-6 py-6 sm:py-10 pb-16 sm:pb-10 overflow-y-auto">
         <div className="bg-slate-900 border-2 border-slate-700 w-full max-w-xl rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-2xl space-y-4 sm:space-y-6 my-auto">
+          {/* Top Bar trong phòng: Nút Rời phòng / Quay lại Menu */}
+          <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+            <button
+              type="button"
+              onClick={onLeaveRoom}
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-950/70 text-slate-300 hover:text-rose-300 border border-slate-700 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+            >
+              <span>←</span>
+              <span>Rời Phòng / Về Menu</span>
+            </button>
+            <span className="text-[11px] text-slate-400 font-medium">
+              {isHost ? '👑 Bạn là Chủ phòng' : '👤 Người chơi'}
+            </span>
+          </div>
+
           {/* Header Phòng */}
           <div className="text-center space-y-2">
             <span className="text-4xl">💣</span>
@@ -212,32 +229,51 @@ export const Lobby: React.FC<LobbyProps> = ({
                 </div>
               </div>
 
-              <div className="flex justify-center">
-                <button
-                  onClick={() => setShowDeckModal(true)}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl border border-slate-700 transition flex items-center gap-2"
-                >
-                  <span>🛠️</span> Tùy Chỉnh Số Lượng Thẻ Bài & Luật Chia
-                </button>
-              </div>
             </div>
           )}
 
-          {/* Nút bắt đầu */}
-          <div className="pt-2">
+          {/* Cụm nút hành động: Thiết lập bộ bài & Bắt đầu trận đấu (Ngang hàng) */}
+          <div className="pt-2 flex flex-col gap-2.5">
             {isHost ? (
-              <button
-                onClick={onStartGame}
-                disabled={room.players.length < 2}
-                className="w-full py-4 bg-yellow-400 hover:bg-yellow-300 text-slate-950 font-black text-lg rounded-2xl shadow-xl shadow-yellow-400/20 transition transform active:scale-95 disabled:opacity-50"
-              >
-                Bắt Đầu Trận Đấu Ngay 🚀
-              </button>
+              <div className="flex flex-col sm:flex-row gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setShowDeckModal(true)}
+                  className={`flex-1 py-3.5 px-3 rounded-2xl font-black text-xs sm:text-sm uppercase transition flex items-center justify-center gap-1.5 shadow-md border cursor-pointer ${
+                    room.deckConfig
+                      ? 'bg-amber-950/80 border-amber-400 text-amber-300'
+                      : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-100'
+                  }`}
+                  title="Cấu hình số lượng các loại thẻ bài và luật chia bài"
+                >
+                  <span>⚙️</span>
+                  <span>Thiết Lập Bộ Bài</span>
+                  {room.deckConfig && <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />}
+                </button>
+
+                <button
+                  onClick={onStartGame}
+                  disabled={room.players.length < 2}
+                  className="flex-[1.5] py-3.5 px-3 bg-yellow-400 hover:bg-yellow-300 text-slate-950 font-black text-xs sm:text-sm uppercase rounded-2xl shadow-xl shadow-yellow-400/20 transition transform active:scale-95 disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <span>🚀</span>
+                  <span>Bắt Đầu Trận Đấu</span>
+                </button>
+              </div>
             ) : (
               <div className="text-center text-sm font-semibold text-slate-400 py-3 bg-slate-800/40 rounded-xl border border-slate-700/40 animate-pulse">
                 Đang chờ Chủ phòng bắt đầu ván đấu...
               </div>
             )}
+
+            <button
+              type="button"
+              onClick={onLeaveRoom}
+              className="w-full py-2 bg-slate-950/70 hover:bg-rose-950/60 text-slate-400 hover:text-rose-300 text-xs font-bold rounded-xl border border-slate-800 transition cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
+            >
+              <span>🚪</span>
+              <span>Rời khỏi phòng chờ và quay lại Menu chính</span>
+            </button>
           </div>
         </div>
 
@@ -385,22 +421,32 @@ export const Lobby: React.FC<LobbyProps> = ({
               </div>
             </div>
 
-            <div className="flex justify-center">
+            {/* Cụm nút hành động Chơi Đơn vs AI: Thiết lập bộ bài & Vào trận đấu (Ngang hàng) */}
+            <div className="flex gap-2.5 pt-2">
               <button
                 type="button"
                 onClick={() => setShowDeckModal(true)}
-                className="text-xs text-yellow-400 hover:underline flex items-center gap-1 font-semibold"
+                className={`flex-1 py-3.5 px-3 rounded-2xl font-black text-xs sm:text-sm uppercase transition flex items-center justify-center gap-1.5 shadow-md border cursor-pointer active:scale-95 ${
+                  deckConfig
+                    ? 'bg-amber-950/80 border-amber-400 text-amber-300'
+                    : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-100'
+                }`}
+                title="Cấu hình số lượng các loại thẻ bài và luật chia bài"
               >
-                <span>🛠️</span> Tùy chỉnh số lượng bài trong bộ...
+                <span>⚙️</span>
+                <span>Thiết Lập Bộ Bài</span>
+                {deckConfig && <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onCreateSinglePlayer(playerName, singlePlayerCount, deckConfig, { nopeTimeoutSec, botDelaySec })}
+                className="flex-[1.5] py-3.5 px-3 bg-yellow-400 hover:bg-yellow-300 text-slate-950 font-black text-xs sm:text-sm uppercase rounded-2xl shadow-xl shadow-yellow-400/20 transition transform active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <span>⚡</span>
+                <span>Vào Trận Đấu</span>
               </button>
             </div>
-
-            <button
-              onClick={() => onCreateSinglePlayer(playerName, singlePlayerCount, deckConfig, { nopeTimeoutSec, botDelaySec })}
-              className="w-full py-4 bg-yellow-400 hover:bg-yellow-300 text-slate-950 font-black text-base uppercase rounded-2xl shadow-xl shadow-yellow-400/20 transition transform active:scale-95"
-            >
-              Vào Trận Đấu Ngay ⚡
-            </button>
           </div>
         )}
 
@@ -411,12 +457,32 @@ export const Lobby: React.FC<LobbyProps> = ({
               📍 Địa chỉ trang web: <strong className="font-mono text-white">{typeof window !== 'undefined' && !window.location.origin.includes('localhost') ? window.location.origin : `http://${lanIp}:3000`}</strong>
             </div>
 
-            <button
-              onClick={() => onCreateMultiplayer(playerName, deckConfig, { nopeTimeoutSec, botDelaySec })}
-              className="w-full py-3.5 bg-yellow-400 hover:bg-yellow-300 text-slate-950 font-black text-sm uppercase rounded-2xl shadow-md transition"
-            >
-              Tạo Phòng Mới (Làm Host)
-            </button>
+            {/* Cụm nút hành động Multiplayer: Thiết lập bộ bài & Tạo phòng mới (Ngang hàng) */}
+            <div className="flex gap-2.5">
+              <button
+                type="button"
+                onClick={() => setShowDeckModal(true)}
+                className={`flex-1 py-3.5 px-3 rounded-2xl font-black text-xs sm:text-sm uppercase transition flex items-center justify-center gap-1.5 shadow-md border cursor-pointer active:scale-95 ${
+                  deckConfig
+                    ? 'bg-amber-950/80 border-amber-400 text-amber-300'
+                    : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-100'
+                }`}
+                title="Cài đặt bộ bài trước khi tạo phòng"
+              >
+                <span>⚙️</span>
+                <span>Thiết Lập Bộ Bài</span>
+                {deckConfig && <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onCreateMultiplayer(playerName, deckConfig, { nopeTimeoutSec, botDelaySec })}
+                className="flex-[1.5] py-3.5 px-3 bg-yellow-400 hover:bg-yellow-300 text-slate-950 font-black text-xs sm:text-sm uppercase rounded-2xl shadow-xl shadow-yellow-400/20 transition transform active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <span>🚀</span>
+                <span>Tạo Phòng (Host)</span>
+              </button>
+            </div>
 
             <div className="relative flex py-1 items-center">
               <div className="flex-grow border-t border-slate-800"></div>

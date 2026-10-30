@@ -267,6 +267,7 @@ export const App: React.FC = () => {
           onStartGame={handleStartGame}
           onUpdateDeckConfig={handleUpdateDeckConfig}
           onUpdateSettings={handleUpdateSettings}
+          onLeaveRoom={handleLeaveGame}
         />
       )}
     </div>

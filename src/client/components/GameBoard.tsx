@@ -158,11 +158,26 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     }
   }, [state.currentPlayerIndex, myPlayerId]);
 
-  // Lắng nghe khi cần Gỡ Bom (Defuse) để kích hoạt Giai đoạn 1: Reveal Mèo Nổ vừa rút
+  // Lắng nghe khi cần Gỡ Bom (Defuse) để kích hoạt Giai đoạn 1: Reveal Mèo Nổ vừa rút (chính mình) hoặc Báo động Spotlight (người khác)
   useEffect(() => {
-    if (state.pendingAction?.type === 'DEFUSE_INSERTION' && state.pendingAction.initiatorId === myPlayerId) {
-      setDefuseStep('reveal');
+    if (state.pendingAction?.type === 'DEFUSE_INSERTION') {
       sound.playNope();
+      if (state.pendingAction.initiatorId === myPlayerId) {
+        setDefuseStep('reveal');
+      } else {
+        const victim = state.players.find(p => p.id === state.pendingAction?.initiatorId);
+        const bombCard = state.pendingAction.cardsPlayed[0] || { uid: 'drawn_bomb', defId: 'exploding_kitten' };
+        if (victim) {
+          setSpotlightData({
+            playerName: victim.name,
+            cards: [bombCard],
+            comboTitle: 'MÈO NỔ! 💣💥'
+          });
+          setTimeout(() => {
+            setSpotlightData(null);
+          }, 2400);
+        }
+      }
     }
   }, [state.pendingAction?.type, state.pendingAction?.initiatorId, myPlayerId]);
 
@@ -183,7 +198,17 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     if (latestLog.type === 'explode') {
       sound.playExplosion();
       setIsScreenShaking(true);
-      setTimeout(() => setIsScreenShaking(false), 600);
+      setTimeout(() => setIsScreenShaking(false), 700);
+
+      const victim = state.players.find(p => p.id === latestLog.playerId);
+      if (victim) {
+        setSpotlightData({
+          playerName: victim.name,
+          cards: [{ uid: 'exploded_kitten', defId: 'exploding_kitten' }],
+          comboTitle: 'BÙM! ĐÃ BỊ NỔ TUNG! 💀💥'
+        });
+        setTimeout(() => setSpotlightData(null), 2600);
+      }
     }
 
     // 2. Nếu có hiệu ứng Xào Bài (Shuffle) -> CHỈ kích hoạt animation tráo bài khi bài đã chính thức được xào (sau khi kết thúc Nope window)
@@ -606,6 +631,31 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         />
       )}
 
+      {/* 2.1 Banner Báo Động Khẩn Cấp khi đối thủ rút phải Mèo Nổ */}
+      {state.pendingAction?.type === 'DEFUSE_INSERTION' && state.pendingAction.initiatorId !== myPlayerId && (
+        <div className="fixed top-12 left-1/2 -translate-x-1/2 z-50 w-[92vw] max-w-sm sm:max-w-md animate-fade-in pointer-events-none">
+          <div className="bg-rose-950/95 border-2 border-rose-500 rounded-2xl p-2.5 sm:p-3 shadow-2xl shadow-rose-950/90 backdrop-blur-md flex items-center gap-2.5 sm:gap-3">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-rose-600/90 border-2 border-rose-400 flex items-center justify-center text-xl sm:text-2xl flex-shrink-0 animate-bounce">
+              💣
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] sm:text-xs font-black text-rose-300 uppercase tracking-wide">
+                  ⚠️ BÁO ĐỘNG MÈO NỔ!
+                </span>
+                <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+              </div>
+              <div className="text-xs sm:text-sm font-black text-white truncate">
+                <span className="text-yellow-400 font-extrabold">{state.players.find(p => p.id === state.pendingAction?.initiatorId)?.name || 'Đối thủ'}</span> vừa rút phải MÈO NỔ!
+              </div>
+              <div className="text-[9px] sm:text-[10px] text-rose-200/80 font-medium truncate">
+                {state.players.find(p => p.id === state.pendingAction?.initiatorId)?.isBot ? 'Bot đang dùng lá Gỡ Bom (Defuse) để cứu mạng...' : 'Đang chờ người chơi dùng lá Gỡ Bom (Defuse)...'}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 3. SÀN ĐẤU BÀI TẬP TRUNG (UNIFIED GAME TABLE MAT)
           - Tích hợp đối thủ phân bố vòng cung nhẹ nhàng, tự nhiên
           - Tự động co giãn theo 100% bề ngang màn hình mobile / desktop (không cuộn ngang, không hộp riêng)
@@ -616,6 +666,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         <div className="w-full max-w-4xl flex justify-center items-center gap-1 sm:gap-2 px-1 sm:px-3 pt-1 pb-2 z-20 overflow-visible">
           {opponents.map((opp, idx) => {
             const isTurn = state.status === 'playing' && currentPlayer?.id === opp.id;
+            const isDefusing = state.pendingAction?.type === 'DEFUSE_INSERTION' && state.pendingAction.initiatorId === opp.id;
             const totalOpp = opponents.length;
             const mid = (totalOpp - 1) / 2;
             const t = totalOpp > 1 ? (idx - mid) / mid : 0;
@@ -641,7 +692,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                   transform: `translateY(${arcY}px) rotate(${arcRotate}deg)`
                 }}
                 className={`flex-1 min-w-0 ${maxWClass} rounded-xl sm:rounded-2xl flex flex-col items-center justify-between border transition-all duration-300 origin-center py-1 sm:py-2 px-0.5 sm:px-1.5 ${
-                  isTurn
+                  isDefusing
+                    ? 'scale-110 sm:scale-115 z-40 ring-4 ring-rose-500 shadow-[0_0_35px_rgba(244,63,94,1)] bg-rose-950 border-rose-400 animate-bounce-short'
+                    : isTurn
                     ? 'scale-105 sm:scale-110 z-30 ring-2 sm:ring-4 ring-yellow-400 shadow-[0_0_20px_rgba(250,204,21,0.6)] bg-yellow-950/70 border-yellow-400'
                     : 'bg-slate-900/80 border-slate-800/80 hover:border-slate-700 backdrop-blur-sm'
                 } ${
@@ -649,14 +702,18 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                 }`}
               >
                 {/* Avatar đối thủ */}
-                <div className={`relative text-base sm:text-2xl md:text-3xl transition-transform ${isTurn ? 'scale-110' : ''}`}>
-                  {opp.isAlive ? (opp.isBot ? '🐱' : '👤') : '💀'}
-                  {isTurn && (
+                <div className={`relative text-base sm:text-2xl md:text-3xl transition-transform ${isDefusing ? 'scale-125' : isTurn ? 'scale-110' : ''}`}>
+                  {isDefusing ? '🙀' : opp.isAlive ? (opp.isBot ? '🐱' : '👤') : '💀'}
+                  {isDefusing ? (
+                    <span className="absolute -top-2 -right-2 text-sm sm:text-base animate-ping">
+                      💥
+                    </span>
+                  ) : isTurn ? (
                     <span className="absolute -top-1 -right-1 flex h-2 sm:h-2.5 w-2 sm:w-2.5">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-full w-full bg-yellow-500"></span>
                     </span>
-                  )}
+                  ) : null}
                 </div>
 
                 <div className="text-center w-full min-w-0 px-0.5">
@@ -668,8 +725,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                   </div>
                 </div>
 
-                {/* Trạng thái lượt đi hoặc mất mạng */}
-                {opp.disconnected && opp.isAlive ? (
+                {/* Trạng thái lượt đi, rút bom hoặc mất mạng */}
+                {isDefusing ? (
+                  <span className="text-[6px] sm:text-[7.5px] uppercase font-black px-1.5 py-0.2 rounded-full bg-rose-600 text-white shadow-lg animate-pulse whitespace-nowrap truncate max-w-full flex items-center justify-center gap-0.5 border border-rose-300">
+                    <span>💣</span> RÚT BOM!
+                  </span>
+                ) : opp.disconnected && opp.isAlive ? (
                   <span className="text-[6px] sm:text-[7.5px] uppercase font-black px-1 py-0.2 rounded-full bg-rose-600/90 text-white animate-pulse flex items-center gap-0.5 whitespace-nowrap truncate max-w-full">
                     <span>📶</span> AI
                   </span>

@@ -489,15 +489,16 @@ export class RoomManager {
     // 1. Phản ứng với Pending Action nếu Bot là mục tiêu hoặc đang trong Nope window
     const pending = room.state.pendingAction;
     if (pending) {
-      // Bot cần giấu lại bom sau khi dùng Defuse
+      // Bot cần giấu lại bom sau khi dùng Defuse (kéo dài thêm thời gian để người chơi khác kịp thấy hiệu ứng nổ bom)
       if (pending.type === 'DEFUSE_INSERTION') {
         const bot = room.players.find(p => p.id === pending.initiatorId && (p.isBot || p.disconnected));
         if (bot) {
+          const defuseDelay = Math.max(2600, Math.round(baseBotDelay * 1.3));
           room.botLoopTimeout = setTimeout(() => {
             if (!room.state) return;
             const dec = ProbabilityBot.makeDecision(room.state, bot.id);
             this.insertDefuse(room.id, bot.id, dec.insertIndex ?? 0);
-          }, reactionDelay);
+          }, defuseDelay);
           return;
         }
       }
