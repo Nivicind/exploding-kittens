@@ -138,6 +138,31 @@ io.on('connection', socket => {
     roomManager.insertDefuse(roomId, playerId, insertIndex);
   });
 
+  // Nhét lại Mèo Tự Nổ (Imploding Kitten) ngửa mặt
+  socket.on('insert_imploding', ({ roomId, playerId, insertIndex }) => {
+    roomManager.insertImplodingKitten(roomId, playerId, insertIndex);
+  });
+
+  // Sắp xếp lại Alter the Future 3X
+  socket.on('reorder_alter_future', ({ roomId, playerId, cards }) => {
+    roomManager.reorderAlterFuture(roomId, playerId, cards);
+  });
+
+  // Đóng bảng Alter the Future
+  socket.on('close_alter_future', ({ roomId, playerId }) => {
+    roomManager.closeAlterFuture(roomId, playerId);
+  });
+
+  // Chọn mục tiêu Targeted Attack
+  socket.on('select_targeted_attack', ({ roomId, playerId, targetPlayerId }) => {
+    roomManager.selectTargetedAttack(roomId, playerId, targetPlayerId);
+  });
+
+  // Rút bài từ đáy (Draw from Bottom)
+  socket.on('draw_bottom', ({ roomId, playerId }) => {
+    roomManager.drawFromBottom(roomId, playerId);
+  });
+
   // Chọn người bị Favor
   socket.on('select_favor_target', ({ roomId, playerId, targetPlayerId }) => {
     roomManager.selectFavorTarget(roomId, playerId, targetPlayerId);

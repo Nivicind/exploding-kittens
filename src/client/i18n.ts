@@ -189,6 +189,91 @@ export const CARD_I18N: Record<string, { vi: CardI18n; en: CardI18n }> = {
       subName: 'Mèo Cầu Vồng',
       description: 'Cat card. Pair to steal 1 random card, 3-of-a-kind to name and steal a specific card.'
     }
+  },
+  // BẢN MỞ RỘNG IMPLODING KITTENS
+  imploding_kitten: {
+    vi: {
+      name: 'Mèo Tự Nổ',
+      badge: 'MÈO TỰ NỔ',
+      subName: 'Imploding Kitten',
+      description: 'Rút lần 1 (úp mặt): Không nổ, lật ngửa và đặt lại vào xấp bài. Rút lần 2 (ngửa mặt): NỔ TUNG NGAY LẬP TỨC! Không thể dùng Defuse.'
+    },
+    en: {
+      name: 'Imploding Kitten',
+      badge: 'IMPLODING',
+      subName: 'Mèo Tự Nổ',
+      description: 'First draw (face-down): Do not die, flip face-up and place back in draw pile. Second draw (face-up): IMPLODE IMMEDIATELY! Defuse cannot save you.'
+    }
+  },
+  targeted_attack: {
+    vi: {
+      name: 'Tấn Công Chọn Mục Tiêu',
+      badge: 'TẤN CÔNG 🎯',
+      subName: 'Targeted Attack 2x',
+      description: 'Kết thúc lượt ngay mà không cần rút bài, và chọn đích danh một người chơi phải đi 2 lượt liên tiếp.'
+    },
+    en: {
+      name: 'Targeted Attack 2X',
+      badge: 'TARGET ATTACK',
+      subName: 'Tấn Công Chọn Mục Tiêu',
+      description: 'End your turn without drawing and choose any player to take 2 turns in a row.'
+    }
+  },
+  alter_the_future: {
+    vi: {
+      name: 'Thay Đổi Tương Lai 3X',
+      badge: 'ĐỔI TƯƠNG LAI',
+      subName: 'Alter the Future 3x',
+      description: 'Bí mật xem trộm 3 lá trên cùng và được phép kéo thả sắp xếp lại thứ tự của chúng trước khi đặt lại.'
+    },
+    en: {
+      name: 'Alter the Future 3X',
+      badge: 'ALTER FUTURE',
+      subName: 'Thay Đổi Tương Lai',
+      description: 'Privately view the top 3 cards and rearrange them in any order before putting them back.'
+    }
+  },
+  draw_from_bottom: {
+    vi: {
+      name: 'Rút Bài Từ Đáy',
+      badge: 'RÚT ĐÁY',
+      subName: 'Draw Bottom',
+      description: 'Kết thúc lượt của bạn bằng cách rút lá bài ở dưới đáy xấp bài thay vì rút lá bài trên cùng.'
+    },
+    en: {
+      name: 'Draw from the Bottom',
+      badge: 'DRAW BOTTOM',
+      subName: 'Rút Bài Từ Đáy',
+      description: 'End your turn by drawing the bottom card of the draw pile instead of the top card.'
+    }
+  },
+  reverse: {
+    vi: {
+      name: 'Đảo Chiều',
+      badge: 'ĐẢO CHIỀU',
+      subName: 'Reverse',
+      description: 'Đảo ngược chiều vòng chơi và kết thúc lượt của bạn ngay lập tức mà không cần rút bài.'
+    },
+    en: {
+      name: 'Reverse',
+      badge: 'REVERSE',
+      subName: 'Đảo Chiều',
+      description: 'Reverse the order of play and end your turn without drawing a card.'
+    }
+  },
+  feral_cat: {
+    vi: {
+      name: 'Mèo Hoang',
+      badge: 'MÈO HOANG',
+      subName: 'Feral Cat',
+      description: 'Lá bài vạn năng (Wildcard) có thể đóng vai trò bất kỳ lá Mèo nào để kết hợp thành Combo 2 hoặc 3 lá cướp bài.'
+    },
+    en: {
+      name: 'Feral Cat',
+      badge: 'FERAL CAT',
+      subName: 'Mèo Hoang',
+      description: 'Wildcard cat. Can be used as any Cat card to form a 2-card or 3-card combo.'
+    }
   }
 };
 
@@ -286,6 +371,19 @@ export const UI_TEXT = {
 
     // Modals
     seeFutureTitle: 'Xem Tương Lai (3 Lá Trên Cùng)',
+    alterFutureTitle: 'Thay Đổi Tương Lai (3 Lá Trên Cùng)',
+    alterFutureSub: 'Kéo thả các lá bài để hoán đổi thứ tự của chúng trên đỉnh xấp bài rút:',
+    alterConfirmBtn: 'Xác Nhận Thứ Tự Mới ➔',
+    implodingAlertTitle: 'BẠN VỪA RÚT PHẢI MÈO TỰ NỔ!',
+    implodingAlertSub: 'Bạn chưa chết! Lá bài này sẽ được lật NGỬA MẶT và nhét lại vào xấp bài rút.',
+    implodingPickTitle: 'ĐẶT LẠI MÈO TỰ NỔ NGỬA MẶT',
+    implodingPickSub: 'Bí mật chọn vị trí bạn muốn nhét lại lá Mèo Tự Nổ ngửa mặt vào xấp bài rút:',
+    confirmImplodingPos: 'Đặt Mèo Tự Nổ Tại Đây 🎯',
+    implodingOnTopWarning: '⚠️ MÈO TỰ NỔ NGỬA MẶT ĐANG Ở TRÊN CÙNG!',
+    implodingCardsLeft: (n: number) => `💣 Mèo Tự Nổ ngửa mặt: còn ${n} lá nữa!`,
+    targetedAttackTitle: 'Chọn Mục Tiêu Tấn Công 2X',
+    expansionToggleLabel: 'Bản Mở Rộng: Imploding Kittens 💣💥',
+    expansionToggleSub: 'Tích hợp 6 lá bài mới: Mèo Tự Nổ, Tấn Công Mục Tiêu, Đổi Tương Lai, Rút Đáy, Đảo Chiều, Mèo Hoang',
     defuseAlertTitle: 'BẠN VỪA RÚT PHẢI MÈO NỔ!',
     defuseAlertSub: 'Một quả bom Mèo Nổ vừa chui vào tay bạn!',
     defuseUseBtn: 'Sử Dụng Lá Gỡ Bom (Defuse) 🔧',
@@ -389,6 +487,19 @@ export const UI_TEXT = {
 
     // Modals
     seeFutureTitle: 'See the Future (Top 3 Cards)',
+    alterFutureTitle: 'Alter the Future (Top 3 Cards)',
+    alterFutureSub: 'Drag and drop cards to rearrange their order on top of the draw pile:',
+    alterConfirmBtn: 'Confirm New Order ➔',
+    implodingAlertTitle: 'YOU DREW AN IMPLODING KITTEN!',
+    implodingAlertSub: 'You are safe for now! This card will be flipped FACE-UP and reinserted into the draw pile.',
+    implodingPickTitle: 'REINSERT FACE-UP IMPLODING KITTEN',
+    implodingPickSub: 'Secretly choose where to insert the face-up Imploding Kitten into the draw pile:',
+    confirmImplodingPos: 'Insert Imploding Kitten Here 🎯',
+    implodingOnTopWarning: '⚠️ FACE-UP IMPLODING KITTEN IS ON TOP!',
+    implodingCardsLeft: (n: number) => `💣 Face-up Imploding Kitten: ${n} cards left!`,
+    targetedAttackTitle: 'Choose Target to Attack 2X',
+    expansionToggleLabel: 'Expansion: Imploding Kittens 💣💥',
+    expansionToggleSub: 'Includes 6 new cards: Imploding Kitten, Targeted Attack, Alter Future, Draw Bottom, Reverse, Feral Cat',
     defuseAlertTitle: 'YOU DREW AN EXPLODING KITTEN!',
     defuseAlertSub: 'An Exploding Kitten crept into your hand!',
     defuseUseBtn: 'Use Defuse Card 🔧',

@@ -381,6 +381,67 @@ export class RoomManager {
     }
   }
 
+  insertImplodingKitten(roomId: string, playerId: string, insertIndex: number): void {
+    const room = this.getRoom(roomId);
+    if (!room || !room.state) return;
+
+    try {
+      GameStateManager.insertImplodingKitten(room.state, playerId, insertIndex);
+      this.broadcastRoom(room);
+      this.triggerBotCycle(room);
+    } catch (e: any) {
+      this.emitErrorToPlayer(room, playerId, e.message);
+    }
+  }
+
+  selectTargetedAttack(roomId: string, playerId: string, targetPlayerId: string): void {
+    const room = this.getRoom(roomId);
+    if (!room || !room.state) return;
+
+    try {
+      GameStateManager.selectTargetedAttack(room.state, playerId, targetPlayerId);
+      this.broadcastRoom(room);
+      this.triggerBotCycle(room);
+    } catch (e: any) {
+      this.emitErrorToPlayer(room, playerId, e.message);
+    }
+  }
+
+  reorderAlterFuture(roomId: string, playerId: string, newCards: any[]): void {
+    const room = this.getRoom(roomId);
+    if (!room || !room.state) return;
+
+    try {
+      GameStateManager.reorderAlterFuture(room.state, playerId, newCards);
+      this.broadcastRoom(room);
+      this.triggerBotCycle(room);
+    } catch (e: any) {
+      this.emitErrorToPlayer(room, playerId, e.message);
+    }
+  }
+
+  closeAlterFuture(roomId: string, playerId: string): void {
+    const room = this.getRoom(roomId);
+    if (!room || !room.state) return;
+
+    GameStateManager.closeAlterFuture(room.state, playerId);
+    this.broadcastRoom(room);
+    this.triggerBotCycle(room);
+  }
+
+  drawFromBottom(roomId: string, playerId: string): void {
+    const room = this.getRoom(roomId);
+    if (!room || !room.state) return;
+
+    try {
+      GameStateManager.drawFromBottom(room.state, playerId);
+      this.broadcastRoom(room);
+      this.triggerBotCycle(room);
+    } catch (e: any) {
+      this.emitErrorToPlayer(room, playerId, e.message);
+    }
+  }
+
   selectFavorTarget(roomId: string, playerId: string, targetPlayerId: string): void {
     const room = this.getRoom(roomId);
     if (!room || !room.state) return;
@@ -551,6 +612,58 @@ export class RoomManager {
               this.pickDiscard(room.id, bot.id, dec.pickDiscardUid);
             } else if (room.state.discardPile.length > 0) {
               this.pickDiscard(room.id, bot.id, room.state.discardPile[0].uid);
+            }
+          }, reactionDelay);
+          return;
+        }
+      }
+
+      // Bot nhét lại Mèo Tự Nổ (Imploding Kitten)
+      if (pending.type === 'IMPLODING_INSERTION') {
+        const bot = room.players.find(p => p.id === pending.initiatorId && (p.isBot || p.disconnected));
+        if (bot) {
+          room.botLoopTimeout = setTimeout(() => {
+            if (!room.state) return;
+            const dec = ProbabilityBot.makeDecision(room.state, bot.id);
+            this.insertImplodingKitten(room.id, bot.id, dec.insertIndex ?? 0);
+          }, reactionDelay);
+          return;
+        }
+      }
+
+      // Bot sắp xếp lại bài trong Alter the Future
+      if (pending.type === 'ALTER_THE_FUTURE') {
+        const bot = room.players.find(p => p.id === pending.initiatorId && (p.isBot || p.disconnected));
+        if (bot) {
+          room.botLoopTimeout = setTimeout(() => {
+            if (!room.state) return;
+            const dec = ProbabilityBot.makeDecision(room.state, bot.id);
+            if (dec.action === 'REORDER_ALTER_FUTURE' && dec.alterCardUids) {
+              const currentCards = room.state.alterCards?.cards || room.state.drawPile.slice(0, 3);
+              const reordered = dec.alterCardUids.map(uid => currentCards.find(c => c.uid === uid)!).filter(Boolean);
+              this.reorderAlterFuture(room.id, bot.id, reordered);
+            } else {
+              this.closeAlterFuture(room.id, bot.id);
+            }
+          }, reactionDelay);
+          return;
+        }
+      }
+
+      // Bot chọn mục tiêu cho Targeted Attack
+      if (pending.type === 'TARGETED_ATTACK_CHOOSE_PLAYER') {
+        const bot = room.players.find(p => p.id === pending.initiatorId && (p.isBot || p.disconnected));
+        if (bot) {
+          room.botLoopTimeout = setTimeout(() => {
+            if (!room.state) return;
+            const dec = ProbabilityBot.makeDecision(room.state, bot.id);
+            if (dec.action === 'SELECT_TARGETED_ATTACK' && dec.targetPlayerId) {
+              this.selectTargetedAttack(room.id, bot.id, dec.targetPlayerId);
+            } else {
+              const opponents = room.state.players.filter(p => p.isAlive && p.id !== bot.id);
+              if (opponents.length > 0) {
+                this.selectTargetedAttack(room.id, bot.id, opponents[0].id);
+              }
             }
           }, reactionDelay);
           return;

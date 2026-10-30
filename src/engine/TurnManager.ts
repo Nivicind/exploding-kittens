@@ -62,6 +62,26 @@ export class TurnManager {
   }
 
   /**
+   * Xử lý lá bài Targeted Attack (Tấn công chọn mục tiêu)
+   */
+  static applyTargetedAttack(state: GameState, targetPlayerId: string): number {
+    const current = state.players[state.currentPlayerIndex];
+    const turnsRemaining = current.turnsToTake > 1 ? current.turnsToTake - 1 : 0;
+
+    // Kết thúc ngay lượt của người hiện tại
+    current.turnsToTake = 1;
+
+    // Chuyển sang mục tiêu được chỉ định
+    const targetIdx = state.players.findIndex(p => p.id === targetPlayerId);
+    if (targetIdx === -1) throw new Error('Mục tiêu không hợp lệ.');
+
+    state.currentPlayerIndex = targetIdx;
+    state.players[targetIdx].turnsToTake = 2 + turnsRemaining;
+
+    return targetIdx;
+  }
+
+  /**
    * Xử lý lá bài Skip
    * Trả về true nếu người chơi kết thúc hoàn toàn lượt (chuyển sang người khác),
    * hoặc false nếu vẫn còn lượt do bị dồn Attack trước đó.
@@ -80,10 +100,20 @@ export class TurnManager {
 
   /**
    * Đảo chiều chơi (Reverse - cho bản mở rộng Imploding Kittens)
+   * Trả về true nếu người chơi kết thúc hoàn toàn lượt (chuyển sang người khác theo chiều mới),
+   * hoặc false nếu vẫn còn lượt do bị dồn Attack trước đó (tiếp tục theo chiều mới).
    */
-  static applyReverse(state: GameState): void {
+  static applyReverse(state: GameState): boolean {
     state.turnDirection = state.turnDirection === 1 ? -1 : 1;
-    this.advanceTurn(state);
+    const current = state.players[state.currentPlayerIndex];
+    if (current.turnsToTake > 1) {
+      current.turnsToTake -= 1;
+      return false; // Vẫn còn lượt nhưng đã đổi chiều
+    } else {
+      current.turnsToTake = 1;
+      this.advanceTurn(state);
+      return true; // Đã chuyển sang người tiếp theo theo chiều mới
+    }
   }
 
   /**

@@ -30,7 +30,13 @@ const CARD_PALETTE: Record<string, { bg: string; border: string; text: string; b
   cat_potato:       { bg: '#d97706', border: '#fde68a', text: '#ffffff', badge: 'KHOAI TÂY' },
   cat_cattermelon:  { bg: '#d97706', border: '#fde68a', text: '#ffffff', badge: 'DƯA HẤU' },
   cat_beard:        { bg: '#d97706', border: '#fde68a', text: '#ffffff', badge: 'RÂU XỒM' },
-  cat_rainbow:      { bg: '#d97706', border: '#fde68a', text: '#ffffff', badge: 'CẦU VỒNG' }
+  cat_rainbow:      { bg: '#d97706', border: '#fde68a', text: '#ffffff', badge: 'CẦU VỒNG' },
+  imploding_kitten: { bg: '#2e1065', border: '#c084fc', text: '#ffffff', badge: 'MÈO TỰ NỔ' },
+  targeted_attack:  { bg: '#7c2d12', border: '#fdba74', text: '#ffffff', badge: 'TẤN CÔNG 🎯' },
+  alter_the_future: { bg: '#581c87', border: '#e9d5ff', text: '#ffffff', badge: 'ĐỔI TƯƠNG LAI' },
+  draw_from_bottom: { bg: '#134e4a', border: '#5eead4', text: '#ffffff', badge: 'RÚT ĐÁY' },
+  reverse:          { bg: '#1e3a8a', border: '#93c5fd', text: '#ffffff', badge: 'ĐẢO CHIỀU' },
+  feral_cat:        { bg: '#78350f', border: '#fcd34d', text: '#ffffff', badge: 'MÈO HOANG' }
 };
 
 export const CardView: React.FC<CardViewProps> = ({

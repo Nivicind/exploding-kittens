@@ -228,6 +228,36 @@ export const App: React.FC = () => {
     socket.emit('close_see_future', { roomId, playerId: myPlayerId });
   };
 
+  // Nhét lại Mèo Tự Nổ (Imploding Kitten) ngửa mặt
+  const handleInsertImploding = (insertIndex: number) => {
+    if (!socket || !roomId || !myPlayerId) return;
+    socket.emit('insert_imploding', { roomId, playerId: myPlayerId, insertIndex });
+  };
+
+  // Sắp xếp lại Alter the Future 3X
+  const handleReorderAlterFuture = (cards: any[]) => {
+    if (!socket || !roomId || !myPlayerId) return;
+    socket.emit('reorder_alter_future', { roomId, playerId: myPlayerId, cards });
+  };
+
+  // Đóng bảng Alter the Future
+  const handleCloseAlterFuture = () => {
+    if (!socket || !roomId || !myPlayerId) return;
+    socket.emit('close_alter_future', { roomId, playerId: myPlayerId });
+  };
+
+  // Chọn mục tiêu Targeted Attack
+  const handleSelectTargetedAttack = (targetPlayerId: string) => {
+    if (!socket || !roomId || !myPlayerId) return;
+    socket.emit('select_targeted_attack', { roomId, playerId: myPlayerId, targetPlayerId });
+  };
+
+  // Rút bài từ đáy (Draw from Bottom)
+  const handleDrawBottom = () => {
+    if (!socket || !roomId || !myPlayerId) return;
+    socket.emit('draw_bottom', { roomId, playerId: myPlayerId });
+  };
+
   // Rời bàn đấu
   const handleLeaveGame = () => {
     if (socket && roomId && myPlayerId) {
@@ -269,6 +299,11 @@ export const App: React.FC = () => {
           onPickDiscard={handlePickDiscard}
           onCloseSeeFuture={handleCloseSeeFuture}
           onLeaveGame={handleLeaveGame}
+          onInsertImploding={handleInsertImploding}
+          onReorderAlterFuture={handleReorderAlterFuture}
+          onCloseAlterFuture={handleCloseAlterFuture}
+          onSelectTargetedAttack={handleSelectTargetedAttack}
+          onDrawBottom={handleDrawBottom}
           lang={lang}
           onToggleLang={handleToggleLang}
         />

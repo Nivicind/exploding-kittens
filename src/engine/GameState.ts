@@ -66,13 +66,30 @@ export class GameStateManager {
     }));
 
     // 2. Xác định cấu hình bài
+    const finalExpansions = config?.activeExpansions ?? activeExpansions;
+    const hasImploding = finalExpansions.includes('imploding');
+
     // Quy tắc: 2-5 người: 7 lá thường/người; 6-10 người: 4 lá thường/người
     const handSize = config?.handSize ?? (numPlayers <= 5 ? 7 : 4);
     const defuseInDeck = config?.defuseInDeck ?? 2;
-    const explodingKittensCount = numPlayers - 1;
+
+    let explodingKittensCount = config?.explodingKittensCount;
+    let implodingKittensCount = config?.implodingKittensCount;
+
+    if (explodingKittensCount === undefined) {
+      if (hasImploding) {
+        explodingKittensCount = Math.max(1, numPlayers - 2);
+      } else {
+        explodingKittensCount = numPlayers - 1;
+      }
+    }
+
+    if (implodingKittensCount === undefined) {
+      implodingKittensCount = hasImploding ? 1 : 0;
+    }
 
     // 3. Chuẩn bị bài thường và Defuse
-    const allDefs = CardRegistry.getAllCards(activeExpansions);
+    const allDefs = CardRegistry.getAllCards(finalExpansions);
     
     // Đưa 1 lá Defuse cho mỗi người chơi
     for (const player of players) {
@@ -113,14 +130,23 @@ export class GameStateManager {
     }
 
     // 4. Tạo xấp bài rút (Draw Pile):
-    // Gồm bài thường còn lại + Mèo Nổ + Defuse dư
+    // Gồm bài thường còn lại + Mèo Nổ + Mèo Tự Nổ + Defuse dư
     const drawPile: CardInstance[] = [...regularCards];
 
-    // Thêm Mèo Nổ (Exploding Kittens = Số người - 1)
+    // Thêm Mèo Nổ (Exploding Kittens)
     for (let i = 0; i < explodingKittensCount; i++) {
       drawPile.push({
         uid: this.generateId('card_exploding_kitten'),
         defId: 'exploding_kitten'
+      });
+    }
+
+    // Thêm Mèo Tự Nổ (Imploding Kittens, ban đầu úp mặt isFaceUp: false)
+    for (let i = 0; i < implodingKittensCount; i++) {
+      drawPile.push({
+        uid: this.generateId('card_imploding_kitten'),
+        defId: 'imploding_kitten',
+        isFaceUp: false
       });
     }
 
@@ -149,10 +175,11 @@ export class GameStateManager {
       pendingAction: null,
       winnerId: null,
       logs: [],
-      activeExpansions,
+      activeExpansions: finalExpansions,
       deckConfig: config,
       settings: settings || { nopeTimeoutSec: 5, botDelaySec: 2 },
-      peekCards: null
+      peekCards: null,
+      alterCards: null
     };
 
     this.addLog(state, `Trận đấu bắt đầu với ${numPlayers} người chơi! ${players[firstPlayerIndex].name} được chọn đi đầu tiên.`, 'info');
@@ -181,7 +208,115 @@ export class GameStateManager {
   }
 
   /**
-   * Người chơi rút bài để kết thúc lượt
+   * Xử lý kết quả của lá bài vừa rút (dùng chung cho rút từ đỉnh hoặc rút từ đáy)
+   */
+  private static processDrawnCard(
+    state: GameState, 
+    player: PlayerState, 
+    card: CardInstance
+  ): { cardDrawn: CardInstance; exploded: boolean } {
+    // 1. Kiểm tra Mèo Tự Nổ (Imploding Kitten)
+    if (card.defId === 'imploding_kitten') {
+      if (!card.isFaceUp) {
+        // LẦN RÚT 1 (Úp mặt): Không nổ, không cần Defuse! Lật ngửa và đặt lại
+        card.isFaceUp = true;
+        state.pendingAction = {
+          type: 'IMPLODING_INSERTION',
+          initiatorId: player.id,
+          cardsPlayed: [card],
+          timeoutMs: 30000,
+          expiresAt: Date.now() + 30000,
+          nopeCount: 0,
+          passedPlayerIds: []
+        };
+        this.addLog(
+          state, 
+          `🌀 ${player.name} vừa rút phải MÈO TỰ NỔ! Lá bài sẽ được lật NGỬA MẶT và nhét lại vào xấp bài rút. Hãy chọn vị trí!`, 
+          'info', 
+          player.id
+        );
+        return { cardDrawn: card, exploded: false };
+      } else {
+        // LẦN RÚT 2 (Ngửa mặt): NỔ TUNG NGAY LẬP TỨC! Defuse hoàn toàn vô tác dụng!
+        player.isAlive = false;
+        state.discardPile.push(...player.hand, card);
+        player.hand = [];
+
+        this.addLog(
+          state, 
+          `💥 BÙM! ${player.name} vừa rút phải MÈO TỰ NỔ NGỬA MẶT! Defuse hoàn toàn vô tác dụng! ${player.name} ĐÃ BỊ LOẠI KHỎI TRẬN!`, 
+          'explode', 
+          player.id
+        );
+
+        const winner = TurnManager.checkWinner(state);
+        if (winner) {
+          const winnerPlayer = state.players.find(p => p.id === winner);
+          this.addLog(state, `🎉 CHÚC MỪNG ${winnerPlayer?.name} LÀ NGƯỜI DUY NHẤT SỐNG SÓT VÀ CHIẾN THẮNG!`, 'win', winner);
+        } else {
+          TurnManager.advanceTurn(state);
+        }
+        return { cardDrawn: card, exploded: true };
+      }
+    }
+
+    // 2. Kiểm tra Mèo Nổ (Exploding Kitten)
+    if (card.defId === 'exploding_kitten') {
+      const defuseIndex = player.hand.findIndex(c => c.defId === 'defuse');
+
+      if (defuseIndex !== -1) {
+        // Có Defuse để gỡ bom!
+        state.pendingAction = {
+          type: 'DEFUSE_INSERTION',
+          initiatorId: player.id,
+          cardsPlayed: [card],
+          timeoutMs: 30000,
+          expiresAt: Date.now() + 30000,
+          nopeCount: 0,
+          passedPlayerIds: []
+        };
+        this.addLog(
+          state, 
+          `⚠️ ${player.name} vừa rút phải MÈO NỔ nhưng có lá GỠ BOM (Defuse)! Hãy chọn vị trí để giấu lại bom.`, 
+          'defuse', 
+          player.id
+        );
+        return { cardDrawn: card, exploded: false };
+      } else {
+        // KHÔNG CÓ DEFUSE -> BÙM! Bị loại!
+        player.isAlive = false;
+        state.discardPile.push(...player.hand, card);
+        player.hand = [];
+
+        this.addLog(
+          state, 
+          `💥 BÙM! ${player.name} rút phải Mèo Nổ mà không có Defuse! ${player.name} ĐÃ BỊ LOẠI KHỎI TRẬN!`, 
+          'explode', 
+          player.id
+        );
+
+        const winner = TurnManager.checkWinner(state);
+        if (winner) {
+          const winnerPlayer = state.players.find(p => p.id === winner);
+          this.addLog(state, `🎉 CHÚC MỪNG ${winnerPlayer?.name} LÀ NGƯỜI DUY NHẤT SỐNG SÓT VÀ CHIẾN THẮNG!`, 'win', winner);
+        } else {
+          TurnManager.advanceTurn(state);
+        }
+        return { cardDrawn: card, exploded: true };
+      }
+    }
+
+    // 3. Rút bài an toàn
+    player.hand.push(card);
+    this.addLog(state, `${player.name} rút 1 lá bài an toàn.`, 'info', player.id);
+
+    // Kết thúc 1 lượt
+    TurnManager.advanceTurn(state);
+    return { cardDrawn: card, exploded: false };
+  }
+
+  /**
+   * Người chơi rút bài để kết thúc lượt (rút từ đỉnh xấp bài)
    */
   static drawCard(state: GameState, playerId: string): { cardDrawn: CardInstance; exploded: boolean } {
     if (state.status !== 'playing') {
@@ -200,52 +335,31 @@ export class GameStateManager {
     }
 
     const card = state.drawPile.shift()!;
+    return this.processDrawnCard(state, player, card);
+  }
 
-    // Kiểm tra nếu rút trúng Mèo Nổ!
-    if (card.defId === 'exploding_kitten') {
-      const defuseIndex = player.hand.findIndex(c => c.defId === 'defuse');
-
-      if (defuseIndex !== -1) {
-        // Có Defuse để gỡ bom!
-        state.pendingAction = {
-          type: 'DEFUSE_INSERTION',
-          initiatorId: player.id,
-          cardsPlayed: [card],
-          timeoutMs: 30000,
-          expiresAt: Date.now() + 30000,
-          nopeCount: 0,
-          passedPlayerIds: []
-        };
-        this.addLog(state, `⚠️ ${player.name} vừa rút phải MÈO NỔ nhưng có lá GỠ BOM (Defuse)! Hãy chọn vị trí để giấu lại bom.`, 'defuse', player.id);
-        return { cardDrawn: card, exploded: false };
-      } else {
-        // KHÔNG CÓ DEFUSE -> BÙM! Bị loại!
-        player.isAlive = false;
-        // Bỏ toàn bộ bài trên tay vào discard pile
-        state.discardPile.push(...player.hand, card);
-        player.hand = [];
-
-        this.addLog(state, `💥 BÙM! ${player.name} rút phải Mèo Nổ mà không có Defuse! ${player.name} ĐÃ BỊ LOẠI KHỎI TRẬN!`, 'explode', player.id);
-
-        const winner = TurnManager.checkWinner(state);
-        if (winner) {
-          const winnerPlayer = state.players.find(p => p.id === winner);
-          this.addLog(state, `🎉 CHÚC MỪNG ${winnerPlayer?.name} LÀ NGƯỜI DUY NHẤT SỐNG SÓT VÀ CHIẾN THẮNG!`, 'win', winner);
-        } else {
-          TurnManager.advanceTurn(state);
-        }
-        return { cardDrawn: card, exploded: true };
-      }
-    } else {
-      // Rút bài an toàn
-      player.hand.push(card);
-      const cardDef = CardRegistry.getCard(card.defId);
-      this.addLog(state, `${player.name} rút 1 lá bài an toàn.`, 'info', player.id);
-
-      // Kết thúc 1 lượt
-      TurnManager.advanceTurn(state);
-      return { cardDrawn: card, exploded: false };
+  /**
+   * Người chơi rút bài từ ĐÁY xấp bài (dùng cho lá Draw from the Bottom)
+   */
+  static drawFromBottom(state: GameState, playerId: string): { cardDrawn: CardInstance; exploded: boolean } {
+    if (state.status !== 'playing') {
+      throw new Error('Trận đấu chưa bắt đầu hoặc đã kết thúc.');
     }
+    const player = state.players[state.currentPlayerIndex];
+    if (player.id !== playerId) {
+      throw new Error('Chưa đến lượt của bạn.');
+    }
+    if (state.pendingAction) {
+      throw new Error('Có hành động đang chờ xử lý.');
+    }
+
+    if (state.drawPile.length === 0) {
+      throw new Error('Xấp bài rút đã cạn.');
+    }
+
+    const card = state.drawPile.pop()!;
+    this.addLog(state, `📥 ${player.name} rút 1 lá bài từ ĐÁY xấp bài!`, 'info', player.id);
+    return this.processDrawnCard(state, player, card);
   }
 
   /**
@@ -277,6 +391,30 @@ export class GameStateManager {
     this.addLog(state, `${player.name} đã dùng Defuse thành công và bí mật giấu Mèo Nổ trở lại xấp bài!`, 'defuse', player.id);
 
     // Hoàn tất lượt rút bài an toàn
+    TurnManager.advanceTurn(state);
+  }
+
+  /**
+   * Đặt lại Mèo Tự Nổ (Imploding Kitten) ngửa mặt vào xấp bài
+   */
+  static insertImplodingKitten(state: GameState, playerId: string, insertIndex: number): void {
+    if (!state.pendingAction || state.pendingAction.type !== 'IMPLODING_INSERTION' || state.pendingAction.initiatorId !== playerId) {
+      throw new Error('Không có yêu cầu nhét lại Mèo Tự Nổ hợp lệ.');
+    }
+
+    const player = state.players.find(p => p.id === playerId);
+    if (!player) throw new Error('Người chơi không tồn tại.');
+
+    const card = state.pendingAction.cardsPlayed[0];
+    card.isFaceUp = true;
+
+    const safeIndex = Math.max(0, Math.min(insertIndex, state.drawPile.length));
+    state.drawPile.splice(safeIndex, 0, card);
+
+    state.pendingAction = null;
+    this.addLog(state, `🌀 ${player.name} đã nhét lại MÈO TỰ NỔ (Ngửa mặt) vào vị trí đã chọn trong xấp bài!`, 'info', player.id);
+
+    // Hoàn tất lượt (không rút thêm bài)
     TurnManager.advanceTurn(state);
   }
 
@@ -420,6 +558,54 @@ export class GameStateManager {
   }
 
   /**
+   * Kiểm tra xem 2 lá bài có tạo thành Combo 2 hợp lệ (cùng tên bài hoặc có Mèo Hoang Feral Cat)
+   */
+  static isValidComboTwo(cards: CardInstance[]): boolean {
+    if (cards.length !== 2) return false;
+    const def0 = CardRegistry.getCard(cards[0].defId);
+    const def1 = CardRegistry.getCard(cards[1].defId);
+    if (!def0 || !def1) return false;
+
+    // 1. Trường hợp cùng tên bài
+    if (cards[0].defId === cards[1].defId) return true;
+
+    // 2. Trường hợp có Mèo Hoang (Feral Cat) kết hợp với lá mèo khác
+    const hasFeral = cards[0].defId === 'feral_cat' || cards[1].defId === 'feral_cat';
+    if (hasFeral) {
+      // Cả 2 lá đều phải là loại CAT
+      return def0.type === 'CAT' && def1.type === 'CAT';
+    }
+
+    return false;
+  }
+
+  /**
+   * Kiểm tra xem 3 lá bài có tạo thành Combo 3 hợp lệ (cùng tên bài hoặc có Mèo Hoang Feral Cat)
+   */
+  static isValidComboThree(cards: CardInstance[]): boolean {
+    if (cards.length !== 3) return false;
+    const defs = cards.map(c => CardRegistry.getCard(c.defId));
+    if (defs.some(d => !d)) return false;
+
+    // 1. Trường hợp cả 3 lá cùng tên bài
+    if (cards[0].defId === cards[1].defId && cards[1].defId === cards[2].defId) return true;
+
+    // 2. Trường hợp có Mèo Hoang (Feral Cat)
+    const feralCount = cards.filter(c => c.defId === 'feral_cat').length;
+    if (feralCount > 0) {
+      // Tất cả lá bài đều phải là loại CAT
+      if (!defs.every(d => d!.type === 'CAT')) return false;
+
+      // Các lá không phải Feral Cat phải cùng loại với nhau
+      const nonFeral = cards.filter(c => c.defId !== 'feral_cat');
+      if (nonFeral.length <= 1) return true; // 2 hoặc 3 feral
+      return nonFeral.every(c => c.defId === nonFeral[0].defId);
+    }
+
+    return false;
+  }
+
+  /**
    * Xử lý Combo 2 lá cùng tên (Cướp 1 lá ngẫu nhiên)
    */
   private static handleComboTwo(
@@ -428,8 +614,8 @@ export class GameStateManager {
     cards: CardInstance[],
     options?: { targetPlayerId?: string }
   ): void {
-    if (cards[0].defId !== cards[1].defId) {
-      throw new Error('Combo 2 lá phải có cùng tên bài.');
+    if (!this.isValidComboTwo(cards)) {
+      throw new Error('Combo 2 lá phải có cùng tên bài hoặc kết hợp với Mèo Hoang (Feral Cat).');
     }
     if (!options?.targetPlayerId) {
       throw new Error('Cần chọn mục tiêu để cướp bài.');
@@ -465,8 +651,8 @@ export class GameStateManager {
     cards: CardInstance[],
     options?: { targetPlayerId?: string; targetCardDefId?: string }
   ): void {
-    if (cards[0].defId !== cards[1].defId || cards[1].defId !== cards[2].defId) {
-      throw new Error('Combo 3 lá phải gồm 3 lá có cùng tên bài.');
+    if (!this.isValidComboThree(cards)) {
+      throw new Error('Combo 3 lá phải gồm 3 lá cùng tên bài hoặc kết hợp với Mèo Hoang (Feral Cat).');
     }
     if (!options?.targetPlayerId || !options?.targetCardDefId) {
       throw new Error('Cần chọn mục tiêu và tên lá bài muốn đòi.');
@@ -692,6 +878,72 @@ export class GameStateManager {
         break;
       }
 
+      case 'targeted_attack': {
+        if (!options?.targetPlayerId) {
+          // Mở cửa sổ chọn người bị tấn công đích danh
+          state.pendingAction = {
+            type: 'TARGETED_ATTACK_CHOOSE_PLAYER',
+            initiatorId: player.id,
+            cardsPlayed: [card],
+            timeoutMs: 30000,
+            expiresAt: Date.now() + 30000,
+            nopeCount: 0,
+            passedPlayerIds: []
+          };
+        } else {
+          const targetIdx = TurnManager.applyTargetedAttack(state, options.targetPlayerId);
+          const target = state.players[targetIdx];
+          this.addLog(
+            state, 
+            `🎯 ${player.name} tung TẤN CÔNG CHỌN MỤC TIÊU! ${target.name} bị ép phải đi ${target.turnsToTake} lượt liên tiếp.`, 
+            'play', 
+            player.id
+          );
+        }
+        break;
+      }
+
+      case 'alter_the_future': {
+        const peek = state.drawPile.slice(0, 3);
+        state.alterCards = {
+          playerId: player.id,
+          cards: peek
+        };
+        state.pendingAction = {
+          type: 'ALTER_THE_FUTURE',
+          initiatorId: player.id,
+          cardsPlayed: [card],
+          alterCards: peek,
+          timeoutMs: 60000,
+          expiresAt: Date.now() + 60000,
+          nopeCount: 0,
+          passedPlayerIds: []
+        };
+        this.addLog(state, `🔮 ${player.name} đang xem và sắp xếp lại 3 lá bài trên cùng của xấp rút.`, 'info', player.id);
+        break;
+      }
+
+      case 'draw_from_bottom': {
+        if (state.drawPile.length > 0) {
+          const cardDrawn = state.drawPile.pop()!;
+          this.addLog(state, `📥 ${player.name} rút 1 lá bài từ ĐÁY xấp bài!`, 'info', player.id);
+          this.processDrawnCard(state, player, cardDrawn);
+        }
+        break;
+      }
+
+      case 'reverse': {
+        const turnedEnded = TurnManager.applyReverse(state);
+        const directionText = state.turnDirection === 1 ? 'thuận chiều kim đồng hồ ↻' : 'ngược chiều kim đồng hồ ↺';
+        if (turnedEnded) {
+          const nextPlayer = state.players[state.currentPlayerIndex];
+          this.addLog(state, `🔄 ${player.name} dùng Đảo Chiều! Vòng chơi đổi sang ${directionText}. Đến lượt ${nextPlayer.name}.`, 'info', player.id);
+        } else {
+          this.addLog(state, `🔄 ${player.name} dùng Đảo Chiều để hủy 1 lượt dồn! Vòng chơi đổi sang ${directionText} (vẫn còn ${player.turnsToTake} lượt).`, 'info', player.id);
+        }
+        break;
+      }
+
       default:
         break;
     }
@@ -742,6 +994,56 @@ export class GameStateManager {
 
     state.pendingAction = null;
     this.addLog(state, `🤝 ${target.name} đã đưa 1 lá bài cho ${initiator.name}.`, 'info', target.id);
+  }
+
+  /**
+   * Chọn người cho lá bài Targeted Attack
+   */
+  static selectTargetedAttack(state: GameState, playerId: string, targetPlayerId: string): void {
+    if (!state.pendingAction || state.pendingAction.type !== 'TARGETED_ATTACK_CHOOSE_PLAYER' || state.pendingAction.initiatorId !== playerId) {
+      throw new Error('Yêu cầu chọn mục tiêu Targeted Attack không hợp lệ.');
+    }
+    const initiator = state.players.find(p => p.id === playerId);
+    state.pendingAction = null;
+    const targetIdx = TurnManager.applyTargetedAttack(state, targetPlayerId);
+    const target = state.players[targetIdx];
+    this.addLog(
+      state, 
+      `🎯 ${initiator?.name} tung TẤN CÔNG CHỌN MỤC TIÊU! ${target.name} bị ép phải đi ${target.turnsToTake} lượt liên tiếp.`, 
+      'play', 
+      playerId
+    );
+  }
+
+  /**
+   * Sắp xếp lại các lá bài trong Alter the Future
+   */
+  static reorderAlterFuture(state: GameState, playerId: string, newCards: CardInstance[]): void {
+    if (!state.pendingAction || state.pendingAction.type !== 'ALTER_THE_FUTURE' || state.pendingAction.initiatorId !== playerId) {
+      throw new Error('Yêu cầu Thay Đổi Tương Lai không hợp lệ.');
+    }
+    const player = state.players.find(p => p.id === playerId);
+    if (!player) throw new Error('Người chơi không tồn tại.');
+
+    const count = Math.min(newCards.length, state.drawPile.length, 3);
+    for (let i = 0; i < count; i++) {
+      state.drawPile[i] = newCards[i];
+    }
+    state.pendingAction = null;
+    state.alterCards = null;
+    this.addLog(state, `🔮 ${player.name} đã sắp xếp lại các lá bài trên cùng của xấp bài rút!`, 'info', player.id);
+  }
+
+  /**
+   * Đóng giao diện Alter the Future (nếu không đổi thứ tự)
+   */
+  static closeAlterFuture(state: GameState, playerId: string): void {
+    if (state.pendingAction?.type === 'ALTER_THE_FUTURE' && state.pendingAction.initiatorId === playerId) {
+      state.pendingAction = null;
+    }
+    if (state.alterCards?.playerId === playerId) {
+      state.alterCards = null;
+    }
   }
 
   /**

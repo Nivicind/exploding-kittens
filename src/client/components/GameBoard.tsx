@@ -14,6 +14,8 @@ import { DefuseModal } from './DefuseModal';
 import { SeeFutureModal } from './SeeFutureModal';
 import { ComboTargetModal } from './ComboTargetModal';
 import { DiscardPileModal } from './DiscardPileModal';
+import { ImplodingInsertModal } from './ImplodingInsertModal';
+import { AlterFutureModal } from './AlterFutureModal';
 import { GameLog } from './GameLog';
 import { sound } from '../../engine/audio/SoundEffects';
 import { Language, UI_TEXT } from '../i18n';
@@ -30,6 +32,11 @@ interface GameBoardProps {
   onPickDiscard: (cardUid: string) => void;
   onCloseSeeFuture: () => void;
   onLeaveGame: () => void;
+  onInsertImploding?: (insertIndex: number) => void;
+  onReorderAlterFuture?: (cards: CardInstance[]) => void;
+  onCloseAlterFuture?: () => void;
+  onSelectTargetedAttack?: (targetPlayerId: string) => void;
+  onDrawBottom?: () => void;
   lang?: Language;
   onToggleLang?: () => void;
 }
@@ -46,6 +53,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   onPickDiscard,
   onCloseSeeFuture,
   onLeaveGame,
+  onInsertImploding,
+  onReorderAlterFuture,
+  onCloseAlterFuture,
+  onSelectTargetedAttack,
+  onDrawBottom,
   lang: langProp,
   onToggleLang: onToggleLangProp
 }) => {
@@ -66,7 +78,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
   const [showDiscardModal, setShowDiscardModal] = useState<boolean>(false);
   const [comboTargetModalData, setComboTargetModalData] = useState<{
-    mode: 'FAVOR_TARGET' | 'COMBO_TWO' | 'COMBO_THREE';
+    mode: 'FAVOR_TARGET' | 'COMBO_TWO' | 'COMBO_THREE' | 'TARGETED_ATTACK';
     cardUids: string[];
   } | null>(null);
 
@@ -136,6 +148,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     ? (explodingKittensCount / state.drawPile.length) * 100 
     : 0;
 
+  // Tìm vị trí của lá Mèo Tự Nổ (Imploding Kitten) nếu nó đang ngửa mặt trong xấp bài rút
+  const faceUpImplodingIndex = state.drawPile.findIndex(
+    c => c.defId === 'imploding_kitten' && c.isFaceUp
+  );
+  const isImplodingOnTop = faceUpImplodingIndex === 0;
+
   // Lắng nghe khi lượt chơi thay đổi để bắn vệt sáng bay giữa 2 người chơi
   useEffect(() => {
     if (state.currentPlayerIndex !== prevPlayerIndexRef.current) {
@@ -178,7 +196,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     }
   }, [state.currentPlayerIndex, myPlayerId]);
 
-  // Lắng nghe khi cần Gỡ Bom (Defuse) để kích hoạt Giai đoạn 1: Reveal Mèo Nổ vừa rút (chính mình) hoặc Báo động Spotlight (người khác)
+  // Lắng nghe khi cần Gỡ Bom (Defuse) hoặc Đặt lại Mèo Tự Nổ (Imploding)
   useEffect(() => {
     if (state.pendingAction?.type === 'DEFUSE_INSERTION') {
       sound.playNope();
@@ -198,8 +216,22 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           }, 2400);
         }
       }
+    } else if (state.pendingAction?.type === 'IMPLODING_INSERTION') {
+      sound.playNope();
+      const victim = state.players.find(p => p.id === state.pendingAction?.initiatorId);
+      const bombCard = state.pendingAction.cardsPlayed[0] || { uid: 'drawn_imploding', defId: 'imploding_kitten' };
+      if (victim && state.pendingAction.initiatorId !== myPlayerId) {
+        setSpotlightData({
+          playerName: victim.name,
+          cards: [bombCard],
+          comboTitle: lang === 'en' ? 'IMPLODING KITTEN! 🌀' : 'MÈO TỰ NỔ! 🌀'
+        });
+        setTimeout(() => {
+          setSpotlightData(null);
+        }, 2400);
+      }
     }
-  }, [state.pendingAction?.type, state.pendingAction?.initiatorId, myPlayerId]);
+  }, [state.pendingAction?.type, state.pendingAction?.initiatorId, myPlayerId, lang]);
 
   // Lắng nghe sự kiện mới từ Log để kích hoạt Animation (Nổ bom, Đánh bài, Xào bài, Cướp bài)
   useEffect(() => {
@@ -475,6 +507,15 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       } else {
         setComboTargetModalData({
           mode: 'FAVOR_TARGET',
+          cardUids: [cardUid]
+        });
+      }
+    } else if (defId === 'targeted_attack') {
+      if (aliveOpponents.length === 1) {
+        onPlayCards([cardUid], { targetPlayerId: aliveOpponents[0].id });
+      } else {
+        setComboTargetModalData({
+          mode: 'TARGETED_ATTACK',
           cardUids: [cardUid]
         });
       }
@@ -765,74 +806,146 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
             {/* B. BÊN PHẢI: TRỒNG BÀI BỐC (DRAW PILE) */}
             <div className="flex flex-col items-center justify-start flex-shrink-0">
-              {/* Trên xấp bài bốc: ghi rõ phần trăm nổ */}
+              {/* Trên xấp bài bốc: ghi rõ phần trăm nổ hoặc cảnh báo Mèo Tự Nổ ngửa mặt */}
               <div className="mb-2 text-center flex flex-col items-center justify-center">
                 <span className="h-4 text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-300 block mb-0.5 leading-none">
-                  TRỒNG BÀI BỐC
+                  {lang === 'en' ? 'DRAW PILE' : 'TRỒNG BÀI BỐC'}
                 </span>
-                <div className={`h-5 inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] sm:text-[10px] font-black leading-none ${
-                  dangerProb >= 35
-                    ? 'bg-rose-500/20 text-rose-300 border-rose-500/50 animate-pulse'
-                    : dangerProb >= 15
-                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/50'
-                    : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
-                }`}>
-                  <span>💣 Nổ: {dangerProb.toFixed(1)}%</span>
-                  <span>({explodingKittensCount} bom / {state.drawPile.length} lá)</span>
-                </div>
-              </div>
-
-              <div
-                onClick={handleDrawCard}
-                className={`relative w-[116px] h-[180px] sm:w-[136px] sm:h-[212px] md:w-[148px] md:h-[228px] rounded-2xl border-2 sm:border-3 flex flex-col items-center justify-between p-2.5 sm:p-3 card-shadow transition-all ${
-                  isShufflingDrawPile
-                    ? 'animate-shuffle-cards border-indigo-400 shadow-[0_0_35px_rgba(99,102,241,0.7)]'
-                    : isMyTurn && !state.pendingAction
-                    ? 'cursor-pointer hover:scale-105 ring-4 ring-yellow-400 border-yellow-400 bg-gradient-to-b from-rose-900 via-rose-950 to-slate-950 animate-pulse'
-                    : 'cursor-not-allowed border-slate-700 bg-gradient-to-b from-slate-800 to-slate-950 opacity-95'
-                }`}
-              >
-                {/* Khi đang xào bài: Hiện 2 lớp lá bài phụ bay lệch sang 2 bên và huy hiệu xào bài */}
-                {isShufflingDrawPile && (
+                {isImplodingOnTop ? (
+                  <div className="h-5 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border border-purple-400 bg-purple-950/90 text-purple-200 text-[9px] sm:text-[10px] font-black shadow-[0_0_15px_rgba(168,85,247,0.7)] animate-pulse leading-none">
+                    <span>{t('implodingOnTopWarning')}</span>
+                  </div>
+                ) : (
                   <>
-                    <div className="absolute inset-0 rounded-2xl bg-gradient-to-b from-indigo-900 to-slate-950 border-2 border-indigo-400/80 pointer-events-none -translate-x-3.5 -rotate-6 transition-transform opacity-80" />
-                    <div className="absolute inset-0 rounded-2xl bg-gradient-to-b from-indigo-900 to-slate-950 border-2 border-indigo-400/80 pointer-events-none translate-x-3.5 rotate-6 transition-transform opacity-80" />
-                    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-indigo-950/90 backdrop-blur-[2px] rounded-2xl border-2 border-indigo-400 shadow-2xl p-2 text-center animate-pulse">
-                      <span className="text-3xl sm:text-4xl animate-spin mb-1">🔀</span>
-                      <span className="text-[11px] sm:text-xs font-black text-indigo-200 uppercase tracking-widest leading-tight">
-                        ĐANG XÀO BÀI...
-                      </span>
+                    <div className={`h-5 inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] sm:text-[10px] font-black leading-none ${
+                      dangerProb >= 35
+                        ? 'bg-rose-500/20 text-rose-300 border-rose-500/50 animate-pulse'
+                        : dangerProb >= 15
+                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/50'
+                        : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
+                    }`}>
+                      <span>💣 {lang === 'en' ? 'Explode:' : 'Nổ:'} {dangerProb.toFixed(1)}%</span>
+                      <span>({explodingKittensCount} bom / {state.drawPile.length} lá)</span>
                     </div>
+                    {faceUpImplodingIndex > 0 && (
+                      <div className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-purple-500/60 bg-purple-950/70 text-purple-300 text-[8.5px] sm:text-[9.5px] font-black shadow-md leading-none animate-pulse">
+                        <span>{t('implodingCardsLeft')(faceUpImplodingIndex)}</span>
+                      </div>
+                    )}
                   </>
                 )}
-
-                <div className="w-full flex justify-between text-rose-500 font-black text-[10px]">
-                  <span>💣</span>
-                  <span>MÈO NỔ</span>
-                </div>
-
-                <div className="text-center my-auto">
-                  <div className="text-4xl sm:text-5xl mb-0.5 drop-shadow-xl">
-                    💣
-                  </div>
-                  <p className="text-[10px] font-black text-rose-300 uppercase tracking-widest">
-                    EXPLODING
-                  </p>
-                </div>
-
-                {isMyTurn && !state.pendingAction ? (
-                  <button
-                    type="button"
-                    className="w-full py-1.5 bg-yellow-400 hover:bg-yellow-300 text-slate-950 font-black text-[10px] uppercase rounded-lg shadow-lg transition"
-                  >
-                    {lang === 'en' ? 'DRAW (End Turn)' : 'RÚT BÀI (Hết Lượt)'}
-                  </button>
-                ) : (
-                  <span className="text-[9px] text-slate-500 uppercase font-semibold">
-                    {isMyTurn ? (lang === 'en' ? 'Resolving...' : 'Đang giải quyết') : (lang === 'en' ? 'Waiting turn' : 'Chờ tới lượt')}
-                  </span>
-                )}
               </div>
+
+              {isImplodingOnTop ? (
+                /* THẺ BÀI MÈO TỰ NỔ NGỬA MẶT Ở ĐẦU TRỒNG BÀI */
+                <div
+                  onClick={handleDrawCard}
+                  className={`relative w-[116px] h-[180px] sm:w-[136px] sm:h-[212px] md:w-[148px] md:h-[228px] rounded-2xl border-3 flex flex-col items-center justify-between p-2.5 sm:p-3 card-shadow transition-all ${
+                    isShufflingDrawPile
+                      ? 'animate-shuffle-cards border-indigo-400 shadow-[0_0_35px_rgba(99,102,241,0.7)]'
+                      : isMyTurn && !state.pendingAction
+                      ? 'cursor-pointer hover:scale-105 ring-4 ring-purple-500 border-purple-400 bg-gradient-to-b from-purple-900 via-purple-950 to-slate-950 shadow-[0_0_35px_rgba(168,85,247,0.9)] animate-pulse'
+                      : 'cursor-not-allowed border-purple-600 bg-gradient-to-b from-purple-950 to-slate-950 opacity-95 shadow-[0_0_20px_rgba(168,85,247,0.5)]'
+                  }`}
+                >
+                  {/* Khi đang xào bài */}
+                  {isShufflingDrawPile && (
+                    <>
+                      <div className="absolute inset-0 rounded-2xl bg-gradient-to-b from-indigo-900 to-slate-950 border-2 border-indigo-400/80 pointer-events-none -translate-x-3.5 -rotate-6 transition-transform opacity-80" />
+                      <div className="absolute inset-0 rounded-2xl bg-gradient-to-b from-indigo-900 to-slate-950 border-2 border-indigo-400/80 pointer-events-none translate-x-3.5 rotate-6 transition-transform opacity-80" />
+                      <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-indigo-950/90 backdrop-blur-[2px] rounded-2xl border-2 border-indigo-400 shadow-2xl p-2 text-center animate-pulse">
+                        <span className="text-3xl sm:text-4xl animate-spin mb-1">🔀</span>
+                        <span className="text-[11px] sm:text-xs font-black text-indigo-200 uppercase tracking-widest leading-tight">
+                          {lang === 'en' ? 'SHUFFLING...' : 'ĐANG XÀO BÀI...'}
+                        </span>
+                      </div>
+                    </>
+                  )}
+
+                  <div className="w-full flex justify-between text-purple-400 font-black text-[10px]">
+                    <span>🌀</span>
+                    <span>{lang === 'en' ? 'IMPLODING' : 'MÈO TỰ NỔ'}</span>
+                  </div>
+
+                  <div className="text-center my-auto">
+                    <div className="text-4xl sm:text-5xl mb-0.5 drop-shadow-xl animate-pulse">
+                      🌀
+                    </div>
+                    <p className="text-[10px] font-black text-purple-300 uppercase tracking-widest">
+                      {lang === 'en' ? 'IMPLODING KITTEN' : 'MÈO TỰ NỔ'}
+                    </p>
+                    <p className="text-[8px] sm:text-[8.5px] font-black text-rose-400 uppercase tracking-wider mt-0.5">
+                      {lang === 'en' ? '⚠️ DEFUSE IS USELESS!' : '⚠️ DEFUSE VÔ DỤNG!'}
+                    </p>
+                  </div>
+
+                  {isMyTurn && !state.pendingAction ? (
+                    <button
+                      type="button"
+                      className="w-full py-1.5 bg-gradient-to-r from-purple-600 to-rose-600 hover:from-purple-500 hover:to-rose-500 text-white font-black text-[9px] sm:text-[10px] uppercase rounded-lg shadow-lg shadow-purple-600/40 transition animate-pulse"
+                    >
+                      {lang === 'en' ? 'DRAW (IMPLODE!)' : 'RÚT BÀI (NỔ TUNG!)'}
+                    </button>
+                  ) : (
+                    <span className="text-[9px] text-purple-400 uppercase font-semibold">
+                      {isMyTurn ? (lang === 'en' ? 'Resolving...' : 'Đang giải quyết') : (lang === 'en' ? 'Waiting turn' : 'Chờ tới lượt')}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                /* THẺ BÀI TRỒNG RÚT BÌNH THƯỜNG */
+                <div
+                  onClick={handleDrawCard}
+                  className={`relative w-[116px] h-[180px] sm:w-[136px] sm:h-[212px] md:w-[148px] md:h-[228px] rounded-2xl border-2 sm:border-3 flex flex-col items-center justify-between p-2.5 sm:p-3 card-shadow transition-all ${
+                    isShufflingDrawPile
+                      ? 'animate-shuffle-cards border-indigo-400 shadow-[0_0_35px_rgba(99,102,241,0.7)]'
+                      : isMyTurn && !state.pendingAction
+                      ? 'cursor-pointer hover:scale-105 ring-4 ring-yellow-400 border-yellow-400 bg-gradient-to-b from-rose-900 via-rose-950 to-slate-950 animate-pulse'
+                      : 'cursor-not-allowed border-slate-700 bg-gradient-to-b from-slate-800 to-slate-950 opacity-95'
+                  }`}
+                >
+                  {/* Khi đang xào bài: Hiện 2 lớp lá bài phụ bay lệch sang 2 bên và huy hiệu xào bài */}
+                  {isShufflingDrawPile && (
+                    <>
+                      <div className="absolute inset-0 rounded-2xl bg-gradient-to-b from-indigo-900 to-slate-950 border-2 border-indigo-400/80 pointer-events-none -translate-x-3.5 -rotate-6 transition-transform opacity-80" />
+                      <div className="absolute inset-0 rounded-2xl bg-gradient-to-b from-indigo-900 to-slate-950 border-2 border-indigo-400/80 pointer-events-none translate-x-3.5 rotate-6 transition-transform opacity-80" />
+                      <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-indigo-950/90 backdrop-blur-[2px] rounded-2xl border-2 border-indigo-400 shadow-2xl p-2 text-center animate-pulse">
+                        <span className="text-3xl sm:text-4xl animate-spin mb-1">🔀</span>
+                        <span className="text-[11px] sm:text-xs font-black text-indigo-200 uppercase tracking-widest leading-tight">
+                          {lang === 'en' ? 'SHUFFLING...' : 'ĐANG XÀO BÀI...'}
+                        </span>
+                      </div>
+                    </>
+                  )}
+
+                  <div className="w-full flex justify-between text-rose-500 font-black text-[10px]">
+                    <span>💣</span>
+                    <span>{lang === 'en' ? 'EXPLODING' : 'MÈO NỔ'}</span>
+                  </div>
+
+                  <div className="text-center my-auto">
+                    <div className="text-4xl sm:text-5xl mb-0.5 drop-shadow-xl">
+                      💣
+                    </div>
+                    <p className="text-[10px] font-black text-rose-300 uppercase tracking-widest">
+                      EXPLODING
+                    </p>
+                  </div>
+
+                  {isMyTurn && !state.pendingAction ? (
+                    <button
+                      type="button"
+                      className="w-full py-1.5 bg-yellow-400 hover:bg-yellow-300 text-slate-950 font-black text-[10px] uppercase rounded-lg shadow-lg transition"
+                    >
+                      {lang === 'en' ? 'DRAW (End Turn)' : 'RÚT BÀI (Hết Lượt)'}
+                    </button>
+                  ) : (
+                    <span className="text-[9px] text-slate-500 uppercase font-semibold">
+                      {isMyTurn ? (lang === 'en' ? 'Resolving...' : 'Đang giải quyết') : (lang === 'en' ? 'Waiting turn' : 'Chờ tới lượt')}
+                    </span>
+                  )}
+                </div>
+              )}
 
               <span className="h-4 mt-2 text-[10px] text-slate-400 font-semibold flex items-center justify-center leading-none">
                 {t('remainingCards').replace('{n}', state.drawPile.length.toString())}
@@ -979,13 +1092,47 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         />
       )}
 
-      {/* Hộp thoại Chọn Mục Tiêu Combo (Favor / Combo 2 / Combo 3) */}
+      {/* Hộp thoại Chọn Mục Tiêu Combo (Favor / Combo 2 / Combo 3 / Targeted Attack) */}
       {comboTargetModalData && (
         <ComboTargetModal
           mode={comboTargetModalData.mode}
           opponents={aliveOpponents}
           onConfirmTarget={handleConfirmComboTarget}
           onCancel={() => setComboTargetModalData(null)}
+          lang={lang}
+        />
+      )}
+
+      {/* Hộp thoại Chọn Mục Tiêu cho Targeted Attack (khi phát động hoặc giải quyết sau Nope) */}
+      {state.pendingAction?.type === 'TARGETED_ATTACK_CHOOSE_PLAYER' && state.pendingAction.initiatorId === myPlayerId && (
+        <ComboTargetModal
+          mode="TARGETED_ATTACK"
+          opponents={aliveOpponents}
+          onConfirmTarget={(targetPlayerId) => onSelectTargetedAttack && onSelectTargetedAttack(targetPlayerId)}
+          lang={lang}
+        />
+      )}
+
+      {/* Hộp thoại Đặt Lại Mèo Tự Nổ (Imploding Kitten) ngửa mặt */}
+      {state.pendingAction?.type === 'IMPLODING_INSERTION' && state.pendingAction.initiatorId === myPlayerId && (
+        <ImplodingInsertModal
+          drawPileCount={state.drawPile.length}
+          players={state.players}
+          turnDirection={state.turnDirection}
+          myPlayerId={myPlayerId}
+          onConfirm={(insertIndex) => onInsertImploding && onInsertImploding(insertIndex)}
+          lang={lang}
+        />
+      )}
+
+      {/* Hộp thoại Thay Đổi Tương Lai (Alter the Future 3X) */}
+      {((state.pendingAction?.type === 'ALTER_THE_FUTURE' && state.pendingAction.initiatorId === myPlayerId) || 
+        (state.alterCards && state.alterCards.playerId === myPlayerId)) && (
+        <AlterFutureModal
+          cards={state.alterCards?.cards || state.pendingAction?.alterCards || state.drawPile.slice(0, 3)}
+          onConfirm={(reordered) => onReorderAlterFuture && onReorderAlterFuture(reordered)}
+          onClose={() => onCloseAlterFuture && onCloseAlterFuture()}
+          lang={lang}
         />
       )}
 

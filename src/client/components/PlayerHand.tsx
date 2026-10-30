@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CardInstance, PlayerState } from '../../engine/types';
 import { CardRegistry } from '../../engine/CardRegistry';
+import { GameStateManager } from '../../engine/GameState';
 import { CardView } from './CardView';
 import { sound } from '../../engine/audio/SoundEffects';
 import { Language, UI_TEXT, CARD_I18N } from '../i18n';
@@ -101,14 +102,11 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
       canPlaySingle = true;
     }
   } else if (count === 2) {
-    if (selectedCards[0].defId === selectedCards[1].defId) {
+    if (GameStateManager.isValidComboTwo(selectedCards)) {
       canPlayComboTwo = true;
     }
   } else if (count === 3) {
-    if (
-      selectedCards[0].defId === selectedCards[1].defId &&
-      selectedCards[1].defId === selectedCards[2].defId
-    ) {
+    if (GameStateManager.isValidComboThree(selectedCards)) {
       canPlayComboThree = true;
     }
   } else if (count === 5) {

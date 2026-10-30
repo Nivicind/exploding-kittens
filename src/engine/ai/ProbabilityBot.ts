@@ -2,12 +2,23 @@ import { GameState, PlayerState, CardInstance } from '../types';
 import { GameStateManager } from '../GameState';
 
 export interface BotDecision {
-  action: 'DRAW' | 'PLAY_CARD' | 'INSERT_DEFUSE' | 'NOPE' | 'PASS_NOPE' | 'GIVE_FAVOR' | 'PICK_DISCARD';
+  action: 
+    | 'DRAW' 
+    | 'PLAY_CARD' 
+    | 'INSERT_DEFUSE' 
+    | 'INSERT_IMPLODING'
+    | 'NOPE' 
+    | 'PASS_NOPE' 
+    | 'GIVE_FAVOR' 
+    | 'PICK_DISCARD'
+    | 'REORDER_ALTER_FUTURE'
+    | 'SELECT_TARGETED_ATTACK';
   cardUids?: string[];
   targetPlayerId?: string;
   targetCardDefId?: string;
   insertIndex?: number;
   pickDiscardUid?: string;
+  alterCardUids?: string[];
 }
 
 export class ProbabilityBot {
@@ -44,6 +55,34 @@ export class ProbabilityBot {
         insertIndex = Math.floor(Math.random() * (state.drawPile.length + 1));
       }
       return { action: 'INSERT_DEFUSE', insertIndex };
+    }
+
+    // 1.1 Nếu đang cần đặt lại Mèo Tự Nổ (Imploding Kitten)
+    if (state.pendingAction && state.pendingAction.type === 'IMPLODING_INSERTION' && state.pendingAction.initiatorId === botId) {
+      // Đặt lên đỉnh 60% để bẫy người kế tiếp, 40% đặt vị trí thứ 2
+      const insertIndex = Math.random() < 0.6 ? 0 : 1;
+      return { action: 'INSERT_IMPLODING', insertIndex };
+    }
+
+    // 1.2 Nếu đang cần sắp xếp lại bài trong Alter the Future
+    if (state.pendingAction && state.pendingAction.type === 'ALTER_THE_FUTURE' && state.pendingAction.initiatorId === botId) {
+      const cards = [...(state.alterCards?.cards || state.drawPile.slice(0, 3))];
+      // Đẩy bom (Mèo Nổ hoặc Mèo Tự Nổ ngửa mặt) ra xa vị trí 0
+      cards.sort((a, b) => {
+        const isDangerA = a.defId === 'exploding_kitten' || (a.defId === 'imploding_kitten' && a.isFaceUp);
+        const isDangerB = b.defId === 'exploding_kitten' || (b.defId === 'imploding_kitten' && b.isFaceUp);
+        if (isDangerA && !isDangerB) return 1;
+        if (!isDangerA && isDangerB) return -1;
+        return 0;
+      });
+      return { action: 'REORDER_ALTER_FUTURE', alterCardUids: cards.map(c => c.uid) };
+    }
+
+    // 1.3 Nếu đang cần chọn mục tiêu cho Targeted Attack
+    if (state.pendingAction && state.pendingAction.type === 'TARGETED_ATTACK_CHOOSE_PLAYER' && state.pendingAction.initiatorId === botId) {
+      const opponents = state.players.filter(p => p.isAlive && p.id !== botId);
+      const primeTarget = opponents.sort((a, b) => b.hand.length - a.hand.length)[0];
+      return { action: 'SELECT_TARGETED_ATTACK', targetPlayerId: primeTarget?.id || opponents[0]?.id };
     }
 
     // 2. Nếu đang trong cửa sổ NOPE
@@ -92,11 +131,41 @@ export class ProbabilityBot {
     }
 
     // 5. Trong lượt chính của Bot:
-    const prob = this.calculateExplosionProbability(state);
+    const isTopMortalDanger = state.drawPile.length > 0 && 
+      state.drawPile[0]?.defId === 'imploding_kitten' && 
+      state.drawPile[0]?.isFaceUp === true;
+
+    const prob = isTopMortalDanger ? 1.0 : this.calculateExplosionProbability(state);
     const hasDefuse = bot.hand.some(c => c.defId === 'defuse');
     const opponents = state.players.filter(p => p.isAlive && p.id !== botId);
     // Chọn đối thủ có nhiều bài nhất làm mục tiêu
     const primeTarget = opponents.sort((a, b) => b.hand.length - a.hand.length)[0];
+
+    // NẾU TRÊN ĐỈNH LÀ MÈO TỰ NỔ NGỬA MẶT: BẰNG MỌI GIÁ PHẢI NÉ!
+    if (isTopMortalDanger) {
+      const bottomDrawCard = bot.hand.find(c => c.defId === 'draw_from_bottom');
+      if (bottomDrawCard) return { action: 'PLAY_CARD', cardUids: [bottomDrawCard.uid] };
+
+      const skipCard = bot.hand.find(c => c.defId === 'skip');
+      if (skipCard) return { action: 'PLAY_CARD', cardUids: [skipCard.uid] };
+
+      const reverseCard = bot.hand.find(c => c.defId === 'reverse');
+      if (reverseCard) return { action: 'PLAY_CARD', cardUids: [reverseCard.uid] };
+
+      const targetedAttackCard = bot.hand.find(c => c.defId === 'targeted_attack');
+      if (targetedAttackCard && primeTarget) {
+        return { action: 'PLAY_CARD', cardUids: [targetedAttackCard.uid], targetPlayerId: primeTarget.id };
+      }
+
+      const attackCard = bot.hand.find(c => c.defId === 'attack');
+      if (attackCard) return { action: 'PLAY_CARD', cardUids: [attackCard.uid] };
+
+      const alterCard = bot.hand.find(c => c.defId === 'alter_the_future');
+      if (alterCard) return { action: 'PLAY_CARD', cardUids: [alterCard.uid] };
+
+      const shuffleCard = bot.hand.find(c => c.defId === 'shuffle');
+      if (shuffleCard) return { action: 'PLAY_CARD', cardUids: [shuffleCard.uid] };
+    }
 
     // Nhóm các lá bài trên tay theo defId để tìm combo
     const cardsByDef: Record<string, CardInstance[]> = {};
@@ -128,9 +197,27 @@ export class ProbabilityBot {
           };
         }
       }
+
+      // Kiểm tra combo 2 lá với Feral Cat
+      const feralCard = bot.hand.find(c => c.defId === 'feral_cat');
+      if (feralCard) {
+        const catCard = bot.hand.find(c => c.uid !== feralCard.uid && c.defId.startsWith('cat_'));
+        if (catCard) {
+          return {
+            action: 'PLAY_CARD',
+            cardUids: [feralCard.uid, catCard.uid],
+            targetPlayerId: primeTarget.id
+          };
+        }
+      }
     }
 
-    // c. Nếu có lá See the Future và chưa xem
+    // c. Nếu có lá Alter the Future hoặc See the Future
+    const alterCard = bot.hand.find(c => c.defId === 'alter_the_future');
+    if (alterCard && prob > 0.1) {
+      return { action: 'PLAY_CARD', cardUids: [alterCard.uid] };
+    }
+
     const seeFutureCard = bot.hand.find(c => c.defId === 'see_the_future');
     if (seeFutureCard && prob > 0.15) {
       return { action: 'PLAY_CARD', cardUids: [seeFutureCard.uid] };
@@ -138,10 +225,28 @@ export class ProbabilityBot {
 
     // d. Nếu xác suất nguy hiểm cao (prob > 0.2) hoặc lượt dồn:
     if (prob > 0.2 || bot.turnsToTake > 1) {
+      // Ưu tiên Targeted Attack
+      const targetedAttack = bot.hand.find(c => c.defId === 'targeted_attack');
+      if (targetedAttack && primeTarget) {
+        return { action: 'PLAY_CARD', cardUids: [targetedAttack.uid], targetPlayerId: primeTarget.id };
+      }
+
       // Ưu tiên Skip
       const skipCard = bot.hand.find(c => c.defId === 'skip');
       if (skipCard) {
         return { action: 'PLAY_CARD', cardUids: [skipCard.uid] };
+      }
+
+      // Ưu tiên Reverse
+      const reverseCard = bot.hand.find(c => c.defId === 'reverse');
+      if (reverseCard) {
+        return { action: 'PLAY_CARD', cardUids: [reverseCard.uid] };
+      }
+
+      // Ưu tiên Draw from Bottom
+      const bottomDrawCard = bot.hand.find(c => c.defId === 'draw_from_bottom');
+      if (bottomDrawCard) {
+        return { action: 'PLAY_CARD', cardUids: [bottomDrawCard.uid] };
       }
 
       // Ưu tiên Attack

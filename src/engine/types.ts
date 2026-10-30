@@ -52,9 +52,12 @@ export interface GameLogEntry {
 export type PendingActionType = 
   | 'NOPE_WINDOW'
   | 'DEFUSE_INSERTION'
+  | 'IMPLODING_INSERTION'
   | 'SEE_THE_FUTURE'
+  | 'ALTER_THE_FUTURE'
   | 'FAVOR_CHOOSE_PLAYER'
   | 'FAVOR_GIVE_CARD'
+  | 'TARGETED_ATTACK_CHOOSE_PLAYER'
   | 'COMBO_TWO_CHOOSE_PLAYER'
   | 'COMBO_THREE_CHOOSE_TARGET'
   | 'COMBO_FIVE_CHOOSE_DISCARD';
@@ -69,12 +72,16 @@ export interface PendingAction {
   expiresAt: number;
   nopeCount: number;            // 0: bình thường, 1: bị nope, 2: nope lại (yup)...
   passedPlayerIds: string[];    // Những người đã ấn Pass cửa sổ Nope
+  alterCards?: CardInstance[];  // 3 lá đang được xếp lại cho Alter the Future
 }
 
 export interface CustomDeckConfig {
   handSize: number;             // Số bài thường chia ban đầu (chuẩn: 7 cho <=5 người, 4 cho >5 người)
   defuseInDeck: number;         // Số defuse dư cho vào xấp rút (mặc định: 2)
   cardCounts: Record<string, number>; // Số lượng từng lá bài
+  explodingKittensCount?: number; // Tùy chỉnh riêng số Mèo Nổ
+  implodingKittensCount?: number; // Tùy chỉnh riêng số Mèo Tự Nổ
+  activeExpansions?: string[];  // ['base', 'imploding']
 }
 
 export interface GameSettings {
@@ -97,5 +104,6 @@ export interface GameState {
   deckConfig?: CustomDeckConfig;
   settings?: GameSettings;
   peekCards?: { playerId: string; cards: CardInstance[] } | null;
+  alterCards?: { playerId: string; cards: CardInstance[] } | null;
 }
 
