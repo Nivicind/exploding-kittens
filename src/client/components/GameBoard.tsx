@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import { GameState, PlayerState, CardInstance } from '../../engine/types';
+import { CardRegistry } from '../../engine/CardRegistry';
 import { CardView } from './CardView';
 import { PlayerHand } from './PlayerHand';
 import { ActionBanner } from './ActionBanner';
@@ -76,6 +77,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   // Hiệu ứng đang xào bài của xấp bài rút
   const [isShufflingDrawPile, setIsShufflingDrawPile] = useState<boolean>(false);
 
+  // Modal xác nhận khi chủ động bấm Rời bàn
+  const [showLeaveConfirmModal, setShowLeaveConfirmModal] = useState<boolean>(false);
+
   // Theo dõi log và index lượt trước đó
   const lastLogIdRef = useRef<string | null>(null);
   const prevPlayerIndexRef = useRef<number>(state.currentPlayerIndex);
@@ -88,6 +92,34 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   const isMyTurn = state.status === 'playing' && currentPlayer?.id === myPlayerId;
   const opponents = state.players.filter(p => p.id !== myPlayerId);
   const aliveOpponents = opponents.filter(p => p.isAlive);
+
+  // Theo dõi sự thay đổi trên tay mình để phát hiện chính xác lá bài nào bị cướp
+  const prevHandRef = useRef<CardInstance[]>(myPlayer?.hand || []);
+  const lastStolenCardRef = useRef<CardInstance | null>(null);
+
+  useEffect(() => {
+    if (myPlayer?.hand) {
+      if (prevHandRef.current.length > myPlayer.hand.length) {
+        // Tìm thấy lá bài vừa bị mất khỏi tay
+        const missing = prevHandRef.current.find(c => !myPlayer.hand.some(curr => curr.uid === c.uid));
+        if (missing) {
+          lastStolenCardRef.current = missing;
+        }
+      }
+      prevHandRef.current = myPlayer.hand;
+    }
+  }, [myPlayer?.hand]);
+
+  // Tự động cuộn mượt căn giữa avatar của người đang đến lượt trên mobile
+  useEffect(() => {
+    if (currentPlayer?.id && opponentRefs.current[currentPlayer.id]) {
+      opponentRefs.current[currentPlayer.id]?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'center'
+      });
+    }
+  }, [state.currentPlayerIndex, currentPlayer?.id]);
 
   // Tính xác suất Mèo Nổ
   const explodingKittensCount = state.drawPile.filter(c => c.defId === 'exploding_kitten').length;
@@ -165,12 +197,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       setTimeout(() => setIsScreenShaking(false), 600);
     }
 
-    // 2. Nếu có hiệu ứng Xào Bài (Shuffle) -> Kích hoạt animation tráo bài trên xấp bài rút
-    if (
-      latestLog.message.includes('xào lại toàn bộ xấp bài rút') ||
-      latestLog.message.includes('xào lại') ||
-      latestLog.message.includes('Xào Bài')
-    ) {
+    // 2. Nếu có hiệu ứng Xào Bài (Shuffle) -> CHỈ kích hoạt animation tráo bài khi bài đã chính thức được xào (sau khi kết thúc Nope window)
+    if (latestLog.message.includes('đã xào lại toàn bộ xấp bài rút')) {
       setIsShufflingDrawPile(true);
       sound.playShuffle();
       setTimeout(() => setIsShufflingDrawPile(false), 1600);
@@ -185,10 +213,14 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       ) {
         const actorId = latestLog.playerId;
         const actor = state.players.find(p => p.id === actorId)?.name || 'Đối thủ';
-        setStolenNotification(`Bạn vừa bị ${actor} cướp mất 1 lá bài!`);
+        const stolenCard = lastStolenCardRef.current;
+        const stolenCardDef = stolenCard ? CardRegistry.getCard(stolenCard.defId) : null;
+        const cardNameText = stolenCardDef ? ` lá "${stolenCardDef.nameVi}"` : ' 1 lá bài';
+
+        setStolenNotification(`Bạn vừa bị ${actor} cướp mất${cardNameText}!`);
         setTimeout(() => setStolenNotification(null), 5500);
 
-        // Bắn lá bài bay từ tay mình lên avatar người cướp bài
+        // Bắn lá bài bay từ tay mình lên avatar người cướp bài (ngửa mặt nếu biết lá bài)
         if (actorId && actorId !== myPlayerId) {
           const windowW = window.innerWidth;
           const windowH = window.innerHeight;
@@ -205,9 +237,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             ...prev,
             {
               id: `fly_stolen_${Date.now()}`,
+              card: stolenCard || undefined,
               from: { x: windowW / 2, y: windowH - 120 },
               to: { x: targetX, y: targetY },
-              isFaceDown: true
+              isFaceDown: !stolenCard
             }
           ]);
           sound.playCardDraw();
@@ -265,6 +298,52 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             }
           ]);
           sound.playCardDraw();
+        }
+      }
+      // Khi Đối thủ A cướp bài của Đối thủ B
+      else if (latestLog.type === 'combo' && latestLog.message.includes('cướp ngẫu nhiên 1 lá trên tay của')) {
+        const thief = state.players.find(p => p.id === latestLog.playerId);
+        const victim = state.players.find(p => p.id !== latestLog.playerId && latestLog.message.includes(p.name));
+        if (thief && victim && thief.id !== myPlayerId && victim.id !== myPlayerId) {
+          const thiefElem = opponentRefs.current[thief.id];
+          const victimElem = opponentRefs.current[victim.id];
+          if (thiefElem && victimElem) {
+            const rectT = thiefElem.getBoundingClientRect();
+            const rectV = victimElem.getBoundingClientRect();
+            setFlyingTasks(prev => [
+              ...prev,
+              {
+                id: `fly_opp_steal_${Date.now()}`,
+                from: { x: rectV.left + rectV.width / 2, y: rectV.top + rectV.height / 2 },
+                to: { x: rectT.left + rectT.width / 2, y: rectT.top + rectT.height / 2 },
+                isFaceDown: true
+              }
+            ]);
+            sound.playCardDraw();
+          }
+        }
+      }
+      // Khi Đối thủ B đưa bài cho Đối thủ A vì bị Favor
+      else if (latestLog.message.includes('đã đưa 1 lá bài cho')) {
+        const receiver = state.players.find(p => latestLog.message.includes(`cho ${p.name}`));
+        const giver = state.players.find(p => p.id !== receiver?.id && latestLog.message.includes(p.name));
+        if (receiver && giver && receiver.id !== myPlayerId && giver.id !== myPlayerId) {
+          const recvElem = opponentRefs.current[receiver.id];
+          const giverElem = opponentRefs.current[giver.id];
+          if (recvElem && giverElem) {
+            const rectR = recvElem.getBoundingClientRect();
+            const rectG = giverElem.getBoundingClientRect();
+            setFlyingTasks(prev => [
+              ...prev,
+              {
+                id: `fly_opp_favor_${Date.now()}`,
+                from: { x: rectG.left + rectG.width / 2, y: rectG.top + rectG.height / 2 },
+                to: { x: rectR.left + rectR.width / 2, y: rectR.top + rectR.height / 2 },
+                isFaceDown: true
+              }
+            ]);
+            sound.playCardDraw();
+          }
         }
       }
     }
@@ -443,6 +522,15 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     onGiveFavorCard(cardUid);
   };
 
+  // Xử lý bấm nút Rời bàn (Có hỏi xác nhận nếu đang trong trận)
+  const handleLeaveButtonClick = () => {
+    if (state.status === 'playing' && myPlayer?.isAlive) {
+      setShowLeaveConfirmModal(true);
+    } else {
+      onLeaveGame();
+    }
+  };
+
   return (
     <div className={`h-[100dvh] max-h-[100dvh] w-screen overflow-hidden bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 flex flex-col justify-between p-2 select-none relative ${
       isScreenShaking ? 'animate-shake' : ''
@@ -500,7 +588,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             {sound.getMuted() ? '🔇' : '🔊'}
           </button>
           <button
-            onClick={onLeaveGame}
+            onClick={handleLeaveButtonClick}
             className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-rose-950/60 text-slate-300 hover:text-rose-300 border border-slate-700 transition font-bold text-[11px]"
           >
             Rời Bàn
@@ -519,14 +607,14 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
       {/* 3. SÀN ĐẤU BÀI TẬP TRUNG (UNIFIED GAME TABLE MAT)
           - Tích hợp đối thủ phân bố vòng cung trực tiếp trên mặt thảm nỉ của sàn chơi
-          - Hoàn toàn loại bỏ khung viền riêng gây cắt avatar (overflow-visible)
+          - Hỗ trợ cuộn ngang mượt mà trên mobile và tự động căn giữa người đang đến lượt
           - Độ cong uốn rõ nét, tự nhiên (arcY sâu hơn kèm góc xoay nghiêng hướng vào tâm)
           - Người đến lượt tự động tách rộng khoảng cách với 2 người bên cạnh và hào quang rực rỡ
       */}
       <div className="flex-1 min-h-0 relative flex flex-col justify-between items-center w-full px-2 sm:px-4 py-1 overflow-visible">
-        {/* VÒNG ĐỐI THỦ PHÂN BỐ CUNG TRÒN TRÊN THẢM SÀN ĐẤU */}
-        <div className="w-full flex justify-center items-center overflow-visible pt-1 pb-3 z-20">
-          <div className="flex justify-center items-center px-4 overflow-visible max-w-full">
+        {/* VÒNG ĐỐI THỦ PHÂN BỐ CUNG TRÒN TRÊN THẢM SÀN ĐẤU (HỖ TRỢ CUỘN VÀ TỰ ĐỘNG CĂN GIỮA TRÊN MOBILE) */}
+        <div className="w-full flex justify-start sm:justify-center items-center overflow-x-auto scrollbar-none touch-pan-x px-2 pt-1 pb-3 z-20">
+          <div className="flex justify-start sm:justify-center items-center px-4 overflow-visible min-w-full sm:min-w-0">
             {opponents.map((opp, idx) => {
               const isTurn = state.status === 'playing' && currentPlayer?.id === opp.id;
               const totalOpp = opponents.length;
@@ -537,6 +625,13 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               const arcY = Math.pow(Math.abs(t), 1.8) * 38;
               const arcRotate = t * 13;
 
+              // Thu phóng kích thước thẻ avatar theo số lượng người chơi để tránh tràn viền trên mobile
+              const sizeClass = totalOpp > 6
+                ? 'w-16 sm:w-20 md:w-24 p-1 sm:p-1.5'
+                : totalOpp > 4
+                ? 'w-20 sm:w-24 md:w-28 p-1.5 sm:p-2'
+                : 'w-24 sm:w-28 md:w-32 p-2';
+
               return (
                 <div
                   key={opp.id}
@@ -544,8 +639,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                   style={{
                     transform: `translateY(${arcY}px) rotate(${arcRotate}deg)`
                   }}
-                  className={`relative rounded-2xl p-2 w-24 sm:w-28 md:w-32 flex flex-col items-center justify-between border-2 transition-all duration-300 origin-center ${
-                    isTurn ? 'mx-3 sm:mx-6 scale-115 z-30' : 'mx-1 sm:mx-1.5'
+                  className={`relative flex-shrink-0 rounded-2xl flex flex-col items-center justify-between border-2 transition-all duration-300 origin-center ${sizeClass} ${
+                    isTurn ? 'mx-2.5 sm:mx-5 scale-110 z-30' : 'mx-1 sm:mx-1.5'
                   } ${
                     !opp.isAlive
                       ? 'bg-rose-950/20 border-rose-900/40 opacity-40 grayscale'
@@ -555,7 +650,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                   }`}
                 >
                   {/* Avatar đối thủ */}
-                  <div className={`relative text-2xl sm:text-3xl transition-transform ${isTurn ? 'scale-110' : ''}`}>
+                  <div className={`relative text-xl sm:text-3xl transition-transform ${isTurn ? 'scale-110' : ''}`}>
                     {opp.isAlive ? (opp.isBot ? '🐱' : '👤') : '💀'}
                     {isTurn && (
                       <span className="absolute -top-1 -right-1 flex h-3 w-3">
@@ -566,17 +661,22 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                   </div>
 
                   <div className="text-center w-full">
-                    <div className="text-[10px] sm:text-[11px] font-black truncate text-slate-100">{opp.name}</div>
-                    <div className="text-[8.5px] sm:text-[9px] text-slate-400 font-bold">
+                    <div className="text-[9px] sm:text-[11px] font-black truncate text-slate-100">{opp.name}</div>
+                    <div className="text-[8px] sm:text-[9px] text-slate-400 font-bold">
                       {opp.isAlive ? `🎴 ${opp.hand.length} lá` : 'ĐÃ NỔ 💥'}
                     </div>
                   </div>
 
-                  {isTurn && (
-                    <span className="text-[7.5px] sm:text-[8px] uppercase font-black px-1.5 py-0.2 rounded-full bg-yellow-400 text-slate-950 shadow-sm animate-pulse">
+                  {/* Trạng thái lượt đi hoặc mất mạng */}
+                  {opp.disconnected && opp.isAlive ? (
+                    <span className="text-[7px] sm:text-[7.5px] uppercase font-black px-1.5 py-0.2 rounded-full bg-rose-600/90 text-white animate-pulse flex items-center gap-0.5">
+                      <span>📶</span> AI chơi hộ
+                    </span>
+                  ) : isTurn ? (
+                    <span className="text-[7px] sm:text-[8px] uppercase font-black px-1.5 py-0.2 rounded-full bg-yellow-400 text-slate-950 shadow-sm animate-pulse">
                       Đang đi {opp.turnsToTake > 1 ? `(${opp.turnsToTake}L)` : ''}
                     </span>
-                  )}
+                  ) : null}
                 </div>
               );
             })}
@@ -861,8 +961,40 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               onClick={onLeaveGame}
               className="w-full py-3 bg-yellow-400 hover:bg-yellow-300 text-slate-950 font-black text-base rounded-2xl shadow-xl transition transform active:scale-95"
             >
-              Về Phòng Chờ (Lobby)
+              Trở Về Menu Chính 🏠
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal xác nhận khi chủ động Rời bàn giữa trận */}
+      {showLeaveConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in select-none">
+          <div className="bg-slate-900 border-4 border-slate-700 w-full max-w-sm rounded-3xl p-6 shadow-2xl text-center space-y-4">
+            <div className="text-4xl animate-bounce">🚪</div>
+            <h3 className="text-lg sm:text-xl font-black text-white">
+              Xác Nhận Rời Trận Đấu?
+            </h3>
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Trận đấu đang diễn ra và bạn vẫn còn sống. Nếu rời bàn lúc này, <strong>Bot AI</strong> sẽ tự động tiếp quản nhân vật của bạn để các người chơi khác tiếp tục trận đấu bình thường.
+            </p>
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={() => setShowLeaveConfirmModal(false)}
+                className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition cursor-pointer"
+              >
+                Ở Lại Chơi Tiếp
+              </button>
+              <button
+                onClick={() => {
+                  setShowLeaveConfirmModal(false);
+                  onLeaveGame();
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs transition cursor-pointer shadow-lg shadow-rose-600/30"
+              >
+                Xác Nhận Rời Bàn
+              </button>
+            </div>
           </div>
         </div>
       )}

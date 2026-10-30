@@ -20,10 +20,11 @@ export const App: React.FC = () => {
   const [room, setRoom] = useState<RoomData | null>(null);
   const [lanIp, setLanIp] = useState<string>('localhost');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [toastNotification, setToastNotification] = useState<string | null>(null);
 
-  // Khởi tạo Socket.IO kết nối
+  // Khởi tạo Socket.IO kết nối & Tự động kết nối lại khi tải lại trang (F5)
   useEffect(() => {
-    // Kết nối tự động tới server của ván đấu (hỗ trợ cả localhost và thiết bị khác qua mạng LAN)
+    // Kết nối tự động tới server của ván đấu (hỗ trợ cả localhost và thiết bị khác qua mạng LAN/Cloud)
     const newSocket = io();
     setSocket(newSocket);
 
@@ -34,12 +35,47 @@ export const App: React.FC = () => {
         if (data.lanIp) setLanIp(data.lanIp);
       })
       .catch(() => {
-        // Fallback hostname
         setLanIp(window.location.hostname);
       });
 
+    // Tự động kiểm tra phiên chơi dở trong sessionStorage để kết nối lại
+    newSocket.on('connect', () => {
+      const savedSessionStr = sessionStorage.getItem('ek_session');
+      if (savedSessionStr) {
+        try {
+          const saved = JSON.parse(savedSessionStr);
+          if (saved.roomId && saved.playerId) {
+            newSocket.emit('reconnect_room', { roomId: saved.roomId, playerId: saved.playerId }, (res: any) => {
+              if (res && res.success && res.room) {
+                setRoomId(saved.roomId);
+                setMyPlayerId(saved.playerId);
+                setRoom(res.room);
+                setToastNotification('⚡ Đã kết nối lại ván đấu! (AI đã chơi hộ trong lúc bạn vắng mặt)');
+                setTimeout(() => setToastNotification(null), 5000);
+              } else {
+                sessionStorage.removeItem('ek_session');
+              }
+            });
+          }
+        } catch {
+          sessionStorage.removeItem('ek_session');
+        }
+      }
+    });
+
     newSocket.on('room_update', (updatedRoom: RoomData) => {
-      setRoom(updatedRoom);
+      // Chỉ cập nhật nếu người chơi đang ở trong phòng này (tránh bị văng về phòng khi đã bấm rời bàn)
+      const currentSession = sessionStorage.getItem('ek_session');
+      if (currentSession) {
+        try {
+          const session = JSON.parse(currentSession);
+          if (session.roomId === updatedRoom.id) {
+            setRoom(updatedRoom);
+          }
+        } catch {
+          // ignore
+        }
+      }
     });
 
     newSocket.on('game_error', ({ message }: { message: string }) => {
@@ -59,6 +95,7 @@ export const App: React.FC = () => {
 
     socket.emit('create_room', { hostName: name, botCount, deckConfig, settings }, (res: any) => {
       if (res.success) {
+        sessionStorage.setItem('ek_session', JSON.stringify({ roomId: res.roomId, playerId: res.playerId }));
         setRoomId(res.roomId);
         setMyPlayerId(res.playerId);
         setRoom(res.room);
@@ -76,6 +113,7 @@ export const App: React.FC = () => {
     if (!socket) return;
     socket.emit('create_room', { hostName, botCount: 0, deckConfig, settings }, (res: any) => {
       if (res.success) {
+        sessionStorage.setItem('ek_session', JSON.stringify({ roomId: res.roomId, playerId: res.playerId }));
         setRoomId(res.roomId);
         setMyPlayerId(res.playerId);
         setRoom(res.room);
@@ -90,6 +128,7 @@ export const App: React.FC = () => {
     if (!socket) return;
     socket.emit('join_room', { roomId: joinRoomId, playerName }, (res: any) => {
       if (res.success) {
+        sessionStorage.setItem('ek_session', JSON.stringify({ roomId: res.roomId, playerId: res.playerId }));
         setRoomId(res.roomId);
         setMyPlayerId(res.playerId);
         setRoom(res.room);
@@ -176,6 +215,10 @@ export const App: React.FC = () => {
 
   // Rời bàn đấu
   const handleLeaveGame = () => {
+    if (socket && roomId && myPlayerId) {
+      socket.emit('leave_room', { roomId, playerId: myPlayerId });
+    }
+    sessionStorage.removeItem('ek_session');
     setRoom(null);
     setRoomId(null);
     setMyPlayerId(null);
@@ -187,6 +230,13 @@ export const App: React.FC = () => {
       {errorMessage && (
         <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-rose-600 text-white font-bold text-xs sm:text-sm px-5 py-2.5 rounded-2xl shadow-2xl border border-rose-400 animate-bounce">
           ⚠️ {errorMessage}
+        </div>
+      )}
+
+      {/* Toast thông báo chung / khôi phục kết nối */}
+      {toastNotification && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-emerald-600 text-white font-black text-xs sm:text-sm px-5 py-2.5 rounded-2xl shadow-2xl border border-emerald-300 animate-bounce">
+          {toastNotification}
         </div>
       )}
 

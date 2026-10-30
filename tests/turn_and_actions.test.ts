@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { GameStateManager } from '../src/engine/GameState';
 import { TurnManager } from '../src/engine/TurnManager';
+import { RoomManager } from '../src/server/RoomManager';
 
 describe('Kiểm tra Vòng lượt và Hành động lá bài', () => {
   it('Lá bài Attack chuyển lượt và dồn số lượt cho người tiếp theo', () => {
@@ -339,6 +340,54 @@ describe('Kiểm tra Vòng lượt và Hành động lá bài', () => {
 
     // Hành động Skip được thực thi thành công, cửa sổ Nope đóng
     expect(state.pendingAction).toBeNull();
+  });
+
+  it('RoomManager: Người chơi mất kết nối giữa trận được đánh dấu disconnected và AI chơi hộ', () => {
+    const mockIo = {
+      to: () => ({ emit: () => {} }),
+      emit: () => {}
+    } as any;
+    const roomManager = new RoomManager(mockIo);
+    const room = roomManager.createRoom('Host', 'socket_1', 1);
+    roomManager.startGame(room.id);
+
+    const player = room.players[0];
+    expect(player.disconnected).toBeFalsy();
+
+    // Giả lập socket_1 mất kết nối mạng
+    roomManager.handleDisconnect('socket_1');
+
+    expect(player.disconnected).toBe(true);
+    expect(room.state?.players.find(p => p.id === player.id)?.disconnected).toBe(true);
+
+    // Giả lập người chơi kết nối lại với socket_2 mới
+    const reconnectResult = roomManager.reconnectPlayer(room.id, player.id, 'socket_2');
+    expect(reconnectResult.success).toBe(true);
+    expect(player.disconnected).toBe(false);
+    expect(player.socketId).toBe('socket_2');
+    expect(room.state?.players.find(p => p.id === player.id)?.disconnected).toBe(false);
+  });
+
+  it('RoomManager: Người chơi chủ động rời bàn giữa trận được chuyển thành Bot AI', () => {
+    const mockIo = {
+      to: () => ({ emit: () => {} }),
+      emit: () => {}
+    } as any;
+    const roomManager = new RoomManager(mockIo);
+    const room = roomManager.createRoom('Host', 'socket_1', 1);
+    roomManager.startGame(room.id);
+
+    const player = room.players[0];
+    expect(player.isBot).toBe(false);
+
+    // Người chơi chủ động rời bàn
+    const leaveResult = roomManager.leaveRoom(room.id, player.id);
+    expect(leaveResult.success).toBe(true);
+
+    // Nhân vật được chuyển thành Bot AI
+    expect(player.isBot).toBe(true);
+    expect(player.name).toContain('(Bot)');
+    expect(room.state?.players.find(p => p.id === player.id)?.isBot).toBe(true);
   });
 });
 

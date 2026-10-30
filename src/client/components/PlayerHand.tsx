@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { CardInstance, PlayerState } from '../../engine/types';
 import { CardRegistry } from '../../engine/CardRegistry';
 import { CardView } from './CardView';
@@ -272,84 +272,96 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
 
       {/* DANH SÁCH LÁ BÀI XÒE QUẠT SO LE & HOVER TÁCH BÀI (HỖ TRỢ CẢ MOBILE VÀ PC - KHÔNG BỊ CẮT ĐỨT) */}
       <div className={`w-full overflow-x-auto sm:overflow-visible overflow-y-visible pt-16 sm:pt-20 pb-3 px-8 flex justify-start sm:justify-center items-end ${overlapClass} touch-pan-x`}>
-        {player.hand.map((card, idx) => {
-          const isSelected = selectedUids.includes(card.uid);
-          const isNopeCard = card.defId === 'nope';
-          const showNopeGlow = isNopeWindow && isNopeCard;
-          const isHovered = hoveredIndex === idx;
+        <AnimatePresence>
+          {player.hand.map((card, idx) => {
+            const isSelected = selectedUids.includes(card.uid);
+            const isNopeCard = card.defId === 'nope';
+            const showNopeGlow = isNopeWindow && isNopeCard;
+            const isHovered = hoveredIndex === idx;
 
-          // Tính toán góc nghiêng hình cánh quạt nhẹ
-          const diff = idx - midIndex;
-          const angleStep = Math.min(2.8, 24 / Math.max(1, totalCards));
-          const naturalRotate = diff * angleStep;
+            // Tính toán góc nghiêng hình cánh quạt nhẹ
+            const diff = idx - midIndex;
+            const angleStep = Math.min(2.8, 24 / Math.max(1, totalCards));
+            const naturalRotate = diff * angleStep;
 
-          // Uốn cung nhẹ lên trên ở giữa để phần description của tất cả các lá luôn nằm trên mép màn hình
-          const normDiff = Math.abs(diff) / Math.max(1, midIndex);
-          const naturalY = -(1 - Math.pow(normDiff, 2)) * 6;
+            // Uốn cung nhẹ lên trên ở giữa để phần description của tất cả các lá luôn nằm trên mép màn hình
+            const normDiff = Math.abs(diff) / Math.max(1, midIndex);
+            const naturalY = -(1 - Math.pow(normDiff, 2)) * 6;
 
-          // Khi hover lá bài: lá bài bên cạnh né sang một chút để tách bài kiểu Balatro
-          let shiftX = 0;
-          if (hoveredIndex !== null) {
-            if (idx < hoveredIndex) shiftX = -12;
-            if (idx > hoveredIndex) shiftX = 12;
-          }
+            // Khi hover lá bài: lá bài bên cạnh né sang một chút để tách bài kiểu Balatro
+            let shiftX = 0;
+            if (hoveredIndex !== null) {
+              if (idx < hoveredIndex) shiftX = -12;
+              if (idx > hoveredIndex) shiftX = 12;
+            }
 
-          return (
-            <motion.div
-              key={card.uid}
-              onMouseEnter={() => {
-                setHoveredIndex(idx);
-                sound.playCardPlay();
-              }}
-              onMouseLeave={() => setHoveredIndex(null)}
-              animate={{
-                rotate: isHovered || isSelected ? 0 : naturalRotate,
-                y: isSelected ? -26 : isHovered ? -36 : naturalY,
-                x: isHovered ? 0 : shiftX,
-                scale: isHovered ? 1.15 : isSelected ? 1.08 : 1,
-                zIndex: isHovered ? 70 : isSelected ? 50 : idx + 10
-              }}
-              transition={{
-                type: 'spring',
-                stiffness: 450,
-                damping: 25
-              }}
-              className="relative flex-shrink-0 cursor-pointer origin-bottom"
-            >
-              {/* Nút bấm Đánh NOPE nổi ngay trên đầu lá bài (Căn giữa chuẩn xác, không bị cắt xén) */}
-              {showNopeGlow && (
-                <div className="absolute -top-9 sm:-top-10 inset-x-0 flex items-center justify-center z-50 pointer-events-auto">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      sound.playNope();
-                      if (onPlayNope) onPlayNope(card.uid);
-                    }}
-                    className="py-1 px-2.5 sm:px-3 bg-rose-600 hover:bg-rose-500 text-white font-black text-[10px] sm:text-xs uppercase rounded-full shadow-2xl shadow-rose-600/90 border-2 border-rose-300 flex items-center gap-1 animate-bounce cursor-pointer whitespace-nowrap"
-                  >
-                    <span>🚫</span> ĐÁNH NOPE!
-                  </button>
-                </div>
-              )}
+            return (
+              <motion.div
+                key={card.uid}
+                layout
+                initial={{ opacity: 0, scale: 0.8, y: 30 }}
+                exit={{
+                  y: -90,
+                  opacity: 0,
+                  scale: 0.85,
+                  rotate: 6,
+                  filter: 'brightness(1.5)',
+                  transition: { duration: 0.8, ease: 'easeOut' }
+                }}
+                onMouseEnter={() => {
+                  setHoveredIndex(idx);
+                  sound.playCardPlay();
+                }}
+                onMouseLeave={() => setHoveredIndex(null)}
+                animate={{
+                  rotate: isHovered || isSelected ? 0 : naturalRotate,
+                  y: isSelected ? -26 : isHovered ? -36 : naturalY,
+                  x: isHovered ? 0 : shiftX,
+                  scale: isHovered ? 1.15 : isSelected ? 1.08 : 1,
+                  zIndex: isHovered ? 70 : isSelected ? 50 : idx + 10
+                }}
+                transition={{
+                  type: 'spring',
+                  stiffness: 450,
+                  damping: 25
+                }}
+                className="relative flex-shrink-0 cursor-pointer origin-bottom"
+              >
+                {/* Nút bấm Đánh NOPE nổi ngay trên đầu lá bài (Căn giữa chuẩn xác, không bị cắt xén) */}
+                {showNopeGlow && (
+                  <div className="absolute -top-9 sm:-top-10 inset-x-0 flex items-center justify-center z-50 pointer-events-auto">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        sound.playNope();
+                        if (onPlayNope) onPlayNope(card.uid);
+                      }}
+                      className="py-1 px-2.5 sm:px-3 bg-rose-600 hover:bg-rose-500 text-white font-black text-[10px] sm:text-xs uppercase rounded-full shadow-2xl shadow-rose-600/90 border-2 border-rose-300 flex items-center gap-1 animate-bounce cursor-pointer whitespace-nowrap"
+                    >
+                      <span>🚫</span> ĐÁNH NOPE!
+                    </button>
+                  </div>
+                )}
 
-              <CardView
-                card={card}
-                isSelected={isSelected}
-                onClick={() => handleCardClick(card)}
-                disabled={disabled && !showNopeGlow && !isGiveFavorMode}
-                highlight={showNopeGlow || (isGiveFavorMode && !isSelected)}
-                className={
-                  showNopeGlow 
-                    ? 'ring-4 ring-rose-500 shadow-rose-600/90 shadow-2xl' 
-                    : isGiveFavorMode && isSelected 
-                    ? 'ring-4 ring-teal-400 shadow-teal-500/80 shadow-2xl' 
-                    : ''
-                }
-              />
-            </motion.div>
-          );
-        })}
+                <CardView
+                  card={card}
+                  isSelected={isSelected}
+                  onClick={() => handleCardClick(card)}
+                  disabled={disabled && !showNopeGlow && !isGiveFavorMode}
+                  highlight={showNopeGlow || (isGiveFavorMode && !isSelected)}
+                  className={
+                    showNopeGlow 
+                      ? 'ring-4 ring-rose-500 shadow-rose-600/90 shadow-2xl' 
+                      : isGiveFavorMode && isSelected 
+                      ? 'ring-4 ring-teal-400 shadow-teal-500/80 shadow-2xl' 
+                      : ''
+                  }
+                />
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
       </div>
     </div>
   );

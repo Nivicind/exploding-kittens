@@ -38,6 +38,7 @@ export interface PlayerState {
   hand: CardInstance[];
   turnsToTake: number;      // Thường là 1, nhưng có thể bị dồn Attack
   isBlind?: boolean;        // Cho mở rộng Streaking
+  disconnected?: boolean;   // Đang mất kết nối mạng (AI chơi hộ)
 }
 
 export interface GameLogEntry {

@@ -168,9 +168,28 @@ io.on('connection', socket => {
     roomManager.updateSettings(roomId, settings);
   });
 
-  // Ngắt kết nối
+  // Kết nối lại ván đấu (Reconnect khi F5 hoặc mở lại tab)
+  socket.on('reconnect_room', ({ roomId, playerId }, callback) => {
+    const result = roomManager.reconnectPlayer(roomId, playerId, socket.id);
+    if (result.success && result.room) {
+      socket.join(result.room.id);
+      if (callback) callback({ success: true, room: result.room, playerId });
+    } else {
+      if (callback) callback({ success: false, error: result.error });
+    }
+  });
+
+  // Người chơi chủ động rời phòng
+  socket.on('leave_room', ({ roomId, playerId }, callback) => {
+    roomManager.leaveRoom(roomId, playerId);
+    socket.leave(roomId);
+    if (callback) callback({ success: true });
+  });
+
+  // Ngắt kết nối (mất mạng, đóng tab)
   socket.on('disconnect', () => {
     console.log(`[Socket] Ngắt kết nối: ${socket.id}`);
+    roomManager.handleDisconnect(socket.id);
   });
 });
 

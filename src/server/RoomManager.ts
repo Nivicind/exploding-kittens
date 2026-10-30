@@ -8,6 +8,8 @@ export interface RoomPlayer {
   name: string;
   socketId?: string;
   isBot: boolean;
+  disconnected?: boolean;
+  disconnectedAt?: number;
 }
 
 export interface Room {
@@ -145,6 +147,124 @@ export class RoomManager {
 
     this.broadcastRoom(room);
     return { room };
+  }
+
+  /**
+   * Đồng bộ trạng thái mất kết nối giữa RoomPlayer và PlayerState
+   */
+  private syncPlayerDisconnectedStatus(room: Room, playerId: string, disconnected: boolean): void {
+    const p = room.players.find(x => x.id === playerId);
+    if (p) p.disconnected = disconnected;
+    if (room.state) {
+      const sp = room.state.players.find(x => x.id === playerId);
+      if (sp) sp.disconnected = disconnected;
+    }
+  }
+
+  /**
+   * Kiểm tra người chơi là Bot hoặc là người chơi đang mất kết nối
+   */
+  private isBotOrDisconnected(room: Room, playerId?: string): boolean {
+    if (!playerId) return false;
+    const p = room.players.find(x => x.id === playerId);
+    return Boolean(p && (p.isBot || p.disconnected));
+  }
+
+  /**
+   * Xử lý socket ngắt kết nối (mất mạng, tắt tab, refresh)
+   */
+  handleDisconnect(socketId: string): void {
+    for (const room of this.rooms.values()) {
+      const player = room.players.find(p => p.socketId === socketId);
+      if (!player) continue;
+
+      if (room.state && room.state.status === 'playing') {
+        // Đang trong trận: đánh dấu mất kết nối, AI chơi hộ
+        this.syncPlayerDisconnectedStatus(room, player.id, true);
+        player.disconnectedAt = Date.now();
+        GameStateManager.addLog(
+          room.state,
+          `📶 ${player.name} vừa mất kết nối mạng. AI Bot sẽ tạm thời chơi hộ!`,
+          'info',
+          player.id
+        );
+        this.broadcastRoom(room);
+        this.triggerBotCycle(room);
+      } else {
+        // Đang trong sảnh chờ: xóa người chơi khỏi phòng
+        this.removePlayer(room.id, player.id);
+      }
+    }
+  }
+
+  /**
+   * Kết nối lại ván đấu từ sessionStorage
+   */
+  reconnectPlayer(roomId: string, playerId: string, newSocketId: string): { success: boolean; room?: Room; error?: string } {
+    const room = this.getRoom(roomId);
+    if (!room) {
+      return { success: false, error: 'Phòng không tồn tại hoặc đã kết thúc.' };
+    }
+    const player = room.players.find(p => p.id === playerId);
+    if (!player) {
+      return { success: false, error: 'Không tìm thấy người chơi trong phòng.' };
+    }
+
+    player.socketId = newSocketId;
+    this.syncPlayerDisconnectedStatus(room, player.id, false);
+    delete player.disconnectedAt;
+
+    if (room.state && room.state.status === 'playing') {
+      GameStateManager.addLog(
+        room.state,
+        `✅ ${player.name} đã kết nối lại ván đấu!`,
+        'info',
+        player.id
+      );
+    }
+
+    this.broadcastRoom(room);
+    return { success: true, room };
+  }
+
+  /**
+   * Người chơi chủ động rời phòng
+   */
+  leaveRoom(roomId: string, playerId: string): { success: boolean; error?: string } {
+    const room = this.getRoom(roomId);
+    if (!room) return { success: true };
+
+    const player = room.players.find(p => p.id === playerId);
+    if (!player) return { success: true };
+
+    if (room.state && room.state.status === 'playing') {
+      // Ván đấu đang diễn ra: chuyển thành Bot AI vĩnh viễn để ván đấu của người khác tiếp tục bình thường
+      player.isBot = true;
+      player.name = `${player.name} (Bot)`;
+      player.socketId = undefined;
+      player.disconnected = false;
+
+      const statePlayer = room.state.players.find(p => p.id === playerId);
+      if (statePlayer) {
+        statePlayer.isBot = true;
+        statePlayer.name = `${statePlayer.name} (Bot)`;
+        statePlayer.disconnected = false;
+      }
+
+      GameStateManager.addLog(
+        room.state,
+        `👋 ${player.name} đã rời bàn đấu. Bot AI sẽ tiếp quản nhân vật này!`,
+        'info',
+        player.id
+      );
+      this.broadcastRoom(room);
+      this.triggerBotCycle(room);
+    } else {
+      // Đang ở phòng chờ: xóa hẳn người chơi
+      this.removePlayer(roomId, playerId);
+    }
+
+    return { success: true };
   }
 
   removePlayer(roomId: string, playerId: string): void {
@@ -354,9 +474,9 @@ export class RoomManager {
     // 0. Nếu Bot vừa xem trộm See The Future, tự động đóng để tiếp tục ván đấu
     if (room.state.peekCards) {
       const peekPlayer = room.players.find(p => p.id === room.state?.peekCards?.playerId);
-      if (peekPlayer?.isBot) {
+      if (this.isBotOrDisconnected(room, peekPlayer?.id)) {
         room.botLoopTimeout = setTimeout(() => {
-          if (room.state?.peekCards) {
+          if (room.state?.peekCards && peekPlayer) {
             GameStateManager.closeSeeFuture(room.state, peekPlayer.id);
             this.broadcastRoom(room);
             this.triggerBotCycle(room);
@@ -371,7 +491,7 @@ export class RoomManager {
     if (pending) {
       // Bot cần giấu lại bom sau khi dùng Defuse
       if (pending.type === 'DEFUSE_INSERTION') {
-        const bot = room.players.find(p => p.id === pending.initiatorId && p.isBot);
+        const bot = room.players.find(p => p.id === pending.initiatorId && (p.isBot || p.disconnected));
         if (bot) {
           room.botLoopTimeout = setTimeout(() => {
             if (!room.state) return;
@@ -384,7 +504,7 @@ export class RoomManager {
 
       // Bot đánh Favor cần chọn người chơi mục tiêu
       if (pending.type === 'FAVOR_CHOOSE_PLAYER') {
-        const bot = room.players.find(p => p.id === pending.initiatorId && p.isBot);
+        const bot = room.players.find(p => p.id === pending.initiatorId && (p.isBot || p.disconnected));
         if (bot) {
           room.botLoopTimeout = setTimeout(() => {
             if (!room.state) return;
@@ -400,7 +520,7 @@ export class RoomManager {
 
       // Bot bị người khác Favor đòi đưa bài
       if (pending.type === 'FAVOR_GIVE_CARD') {
-        const bot = room.players.find(p => p.id === pending.targetPlayerId && p.isBot);
+        const bot = room.players.find(p => p.id === pending.targetPlayerId && (p.isBot || p.disconnected));
         if (bot) {
           room.botLoopTimeout = setTimeout(() => {
             if (!room.state) return;
@@ -421,7 +541,7 @@ export class RoomManager {
 
       // Bot chọn bài từ Discard Pile (Combo 5 lá)
       if (pending.type === 'COMBO_FIVE_CHOOSE_DISCARD') {
-        const bot = room.players.find(p => p.id === pending.initiatorId && p.isBot);
+        const bot = room.players.find(p => p.id === pending.initiatorId && (p.isBot || p.disconnected));
         if (bot) {
           room.botLoopTimeout = setTimeout(() => {
             if (!room.state) return;
@@ -438,7 +558,7 @@ export class RoomManager {
 
       // Trong cửa sổ NOPE
       if (pending.type === 'NOPE_WINDOW') {
-        const bots = room.players.filter(p => p.isBot);
+        const bots = room.players.filter(p => p.isBot || p.disconnected);
         for (const b of bots) {
           if (!pending.passedPlayerIds.includes(b.id)) {
             const dec = ProbabilityBot.makeDecision(room.state, b.id);
@@ -457,9 +577,9 @@ export class RoomManager {
       }
     }
 
-    // 2. Nếu đến lượt chính của một Bot
+    // 2. Nếu đến lượt chính của một Bot hoặc người chơi đang mất kết nối
     const currentPlayer = room.state.players[room.state.currentPlayerIndex];
-    if (currentPlayer && currentPlayer.isBot && currentPlayer.isAlive && !room.state.pendingAction) {
+    if (currentPlayer && currentPlayer.isAlive && !room.state.pendingAction && this.isBotOrDisconnected(room, currentPlayer.id)) {
       room.botLoopTimeout = setTimeout(() => {
         if (!room.state || room.state.status !== 'playing') return;
         const currentNow = room.state.players[room.state.currentPlayerIndex];
