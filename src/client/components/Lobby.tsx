@@ -80,8 +80,8 @@ export const Lobby: React.FC<LobbyProps> = ({
   // Nếu đang ở trong phòng chờ (Room Lobby)
   if (room) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4">
-        <div className="bg-slate-900 border-2 border-slate-700 w-full max-w-xl rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
+      <div className="min-h-[100dvh] w-full bg-slate-950 flex flex-col items-center justify-start sm:justify-center p-3 sm:p-6 py-6 sm:py-10 pb-16 sm:pb-10 overflow-y-auto">
+        <div className="bg-slate-900 border-2 border-slate-700 w-full max-w-xl rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-2xl space-y-4 sm:space-y-6 my-auto">
           {/* Header Phòng */}
           <div className="text-center space-y-2">
             <span className="text-4xl">💣</span>
@@ -255,17 +255,17 @@ export const Lobby: React.FC<LobbyProps> = ({
 
   // Màn hình chính ngoài sảnh
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4">
-      <div className="bg-slate-900 border-2 border-slate-800 w-full max-w-md rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
+    <div className="min-h-[100dvh] w-full bg-slate-950 flex flex-col items-center justify-start sm:justify-center p-3 sm:p-6 py-6 sm:py-10 pb-16 sm:pb-10 overflow-y-auto">
+      <div className="bg-slate-900 border-2 border-slate-800 w-full max-w-md rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-2xl space-y-4 sm:space-y-6 my-auto">
         {/* Logo và tiêu đề */}
         <div className="text-center">
-          <div className="w-20 h-20 bg-rose-500/20 border-2 border-rose-500 rounded-full flex items-center justify-center mx-auto text-4xl mb-3 animate-bounce-short">
+          <div className="w-14 h-14 sm:w-20 sm:h-20 bg-rose-500/20 border-2 border-rose-500 rounded-full flex items-center justify-center mx-auto text-3xl sm:text-4xl mb-2 sm:mb-3 animate-bounce-short">
             💣
           </div>
-          <h1 className="text-3xl font-black text-yellow-400 uppercase tracking-wider">
+          <h1 className="text-2xl sm:text-3xl font-black text-yellow-400 uppercase tracking-wider">
             MÈO NỔ
           </h1>
-          <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest">
+          <p className="text-[11px] sm:text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest">
             Exploding Kittens Online
           </p>
         </div>
@@ -290,7 +290,7 @@ export const Lobby: React.FC<LobbyProps> = ({
                 : 'text-slate-400 hover:text-white'
             }`}
           >
-            Mạng LAN Nhiều Người
+            Nhiều Người (Online / LAN)
           </button>
         </div>
 
@@ -407,8 +407,8 @@ export const Lobby: React.FC<LobbyProps> = ({
         {/* Nội dung Tab LAN Multiplayer */}
         {tab === 'multi' && (
           <div className="space-y-4 animate-fade-in">
-            <div className="p-3 bg-emerald-950/30 border border-emerald-800/40 rounded-xl text-[11px] text-emerald-300">
-              📍 Địa chỉ mạng LAN của máy bạn: <strong className="font-mono text-white">http://{lanIp}:3000</strong>
+            <div className="p-2.5 sm:p-3 bg-emerald-950/30 border border-emerald-800/40 rounded-xl text-[11px] text-emerald-300">
+              📍 Địa chỉ trang web: <strong className="font-mono text-white">{typeof window !== 'undefined' && !window.location.origin.includes('localhost') ? window.location.origin : `http://${lanIp}:3000`}</strong>
             </div>
 
             <button

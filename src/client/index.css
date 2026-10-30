@@ -3,14 +3,19 @@
 @tailwind utilities;
 
 @layer base {
-  html, body, #root {
-    @apply h-full max-h-screen overflow-hidden;
+  html, body {
+    @apply h-full min-h-full;
     user-select: none;
     -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  #root {
+    @apply h-full min-h-full;
   }
 
   body {
-    @apply bg-slate-950 text-slate-100 antialiased selection:bg-rose-500 selection:text-white font-sans;
+    @apply bg-slate-950 text-slate-100 antialiased selection:bg-rose-500 selection:text-white font-sans overflow-x-hidden;
   }
 }
 

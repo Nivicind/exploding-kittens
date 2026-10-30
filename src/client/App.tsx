@@ -182,7 +182,7 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="relative min-h-screen bg-slate-950 text-slate-100">
+    <div className="relative min-h-[100dvh] w-full bg-slate-950 text-slate-100 overflow-x-hidden">
       {/* Toast thông báo lỗi nếu có */}
       {errorMessage && (
         <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-rose-600 text-white font-bold text-xs sm:text-sm px-5 py-2.5 rounded-2xl shadow-2xl border border-rose-400 animate-bounce">
