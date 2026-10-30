@@ -1,0 +1,54 @@
+import { CardDefinition } from './types';
+import { BASE_GAME_CARDS } from './packs/BaseGamePack';
+
+export class CardRegistry {
+  private static cards: Map<string, CardDefinition> = new Map();
+  private static packs: Map<string, { name: string; cards: CardDefinition[] }> = new Map();
+
+  static init() {
+    this.cards.clear();
+    this.packs.clear();
+
+    // Đăng ký Base Game Pack mặc định
+    this.registerPack('base', 'Bộ Mèo Nổ Gốc (Original Edition)', BASE_GAME_CARDS);
+  }
+
+  static registerPack(packId: string, packName: string, cards: CardDefinition[]) {
+    this.packs.set(packId, { name: packName, cards });
+    for (const card of cards) {
+      this.cards.set(card.id, card);
+    }
+  }
+
+  static getCard(defId: string): CardDefinition | undefined {
+    if (this.cards.size === 0) {
+      this.init();
+    }
+    return this.cards.get(defId);
+  }
+
+  static getAllCards(activePacks: string[] = ['base']): CardDefinition[] {
+    if (this.cards.size === 0) {
+      this.init();
+    }
+    const result: CardDefinition[] = [];
+    for (const packId of activePacks) {
+      const pack = this.packs.get(packId);
+      if (pack) {
+        result.push(...pack.cards);
+      }
+    }
+    return result;
+  }
+
+  static getPacks() {
+    if (this.packs.size === 0) {
+      this.init();
+    }
+    return Array.from(this.packs.entries()).map(([id, p]) => ({ id, name: p.name, count: p.cards.length }));
+  }
+}
+
+// Khởi tạo ngay khi module được import
+CardRegistry.init();
+
