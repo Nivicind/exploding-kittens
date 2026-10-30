@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PendingAction, PlayerState } from '../../engine/types';
 import { CardRegistry } from '../../engine/CardRegistry';
@@ -18,7 +18,13 @@ export const ActionBanner: React.FC<ActionBannerProps> = ({
   onPassNope,
   lang = 'vi'
 }) => {
-  const [timeLeft, setTimeLeft] = useState<number>(3.5);
+  // Giới hạn thời gian cửa sổ Nope từ 2s đến 10s theo cài đặt phòng (mặc định 5s)
+  // KHÔNG dùng expiresAt - Date.now() vì dễ bị lệch múi giờ / clock skew giữa client và server cloud gây lỗi hiển thị 30s
+  const rawTimeout = pendingAction.timeoutMs ? pendingAction.timeoutMs / 1000 : 5;
+  const totalDuration = Math.min(10, Math.max(2, rawTimeout));
+
+  const [timeLeft, setTimeLeft] = useState<number>(totalDuration);
+  const startTimeRef = useRef<number>(Date.now());
   const t = UI_TEXT[lang];
 
   const cardPlayed = pendingAction.cardsPlayed[0];
@@ -32,18 +38,22 @@ export const ActionBanner: React.FC<ActionBannerProps> = ({
 
   useEffect(() => {
     sound.playTicking();
+    startTimeRef.current = Date.now();
+    setTimeLeft(totalDuration);
+
     const interval = setInterval(() => {
-      const remaining = Math.max(0, (pendingAction.expiresAt - Date.now()) / 1000);
+      const elapsed = (Date.now() - startTimeRef.current) / 1000;
+      const remaining = Math.max(0, totalDuration - elapsed);
       setTimeLeft(remaining);
       if (remaining <= 0) {
         clearInterval(interval);
       }
-    }, 100);
+    }, 80);
 
     return () => clearInterval(interval);
-  }, [pendingAction.expiresAt]);
+  }, [cardPlayed?.uid, pendingAction.nopeCount, totalDuration]);
 
-  const progressPercent = Math.max(0, Math.min(100, (timeLeft / 3.5) * 100));
+  const progressPercent = Math.max(0, Math.min(100, (timeLeft / totalDuration) * 100));
 
   return (
     /* Trên mobile: Đặt ở khoảng trống phía trên bàn chơi (top-28), thiết kế dạng con nhộng siêu gọn, không che bài / đối thủ.

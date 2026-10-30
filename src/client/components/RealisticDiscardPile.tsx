@@ -2,10 +2,12 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CardInstance } from '../../engine/types';
 import { CardView } from './CardView';
+import { Language } from '../i18n';
 
 interface RealisticDiscardPileProps {
   discardPile: CardInstance[];
   onOpenModal: () => void;
+  lang?: Language;
 }
 
 // Danh sách các góc xoay xô lệch ngẫu nhiên nhẹ cho từng tầng bài trong xấp
@@ -13,7 +15,8 @@ const STACK_ROTATIONS = [-3, 3, -2, 4, -1, 3, -4, 2];
 
 export const RealisticDiscardPile: React.FC<RealisticDiscardPileProps> = ({
   discardPile,
-  onOpenModal
+  onOpenModal,
+  lang = 'vi'
 }) => {
   const topCards = discardPile.slice(-4); // Lấy tối đa 4 lá gần nhất để tạo độ dày
   const topCard = topCards[topCards.length - 1];
@@ -21,12 +24,12 @@ export const RealisticDiscardPile: React.FC<RealisticDiscardPileProps> = ({
   return (
     <div className="flex flex-col items-center justify-start flex-shrink-0">
       {/* Tiêu đề & huy hiệu số lượng bài bỏ: Cân đối hoàn hảo với bên Trồng Bài Bốc */}
-      <div className="mb-2 text-center flex flex-col items-center justify-center">
-        <span className="h-4 text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-300 block mb-0.5 leading-none">
-          BÀI ĐÃ ĐÁNH RA
+      <div className="h-10 sm:h-11 mb-2 text-center flex flex-col items-center justify-end">
+        <span className="h-4 text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-300 block mb-0.5 leading-none whitespace-nowrap">
+          {lang === 'en' ? 'DISCARD PILE' : 'BÀI ĐÃ ĐÁNH RA'}
         </span>
-        <div className="h-5 inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-slate-700/80 bg-slate-800/60 text-[9px] sm:text-[10px] font-bold text-slate-300 leading-none">
-          <span>🗑️ Đã đánh: {discardPile.length} lá</span>
+        <div className="h-5 inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-slate-700/80 bg-slate-800/60 text-[9px] sm:text-[10px] font-bold text-slate-300 leading-none whitespace-nowrap">
+          <span>🗑️ {lang === 'en' ? `Discarded: ${discardPile.length}` : `Đã đánh: ${discardPile.length} lá`}</span>
         </div>
       </div>
 
@@ -39,16 +42,18 @@ export const RealisticDiscardPile: React.FC<RealisticDiscardPileProps> = ({
           <div className="w-full h-full rounded-2xl border-2 sm:border-3 border-dashed border-slate-700 bg-gradient-to-b from-slate-800/80 to-slate-950/90 flex flex-col items-center justify-between p-2.5 sm:p-3 card-shadow text-center">
             <div className="w-full flex justify-between text-slate-500 font-bold text-[9px] uppercase">
               <span>🗑️</span>
-              <span>BÀI BỎ</span>
+              <span>{lang === 'en' ? 'DISCARD' : 'BÀI BỎ'}</span>
             </div>
             
             <div className="my-auto flex flex-col items-center">
               <span className="text-3xl sm:text-4xl mb-1 text-slate-600">🗑️</span>
-              <span className="text-[10px] sm:text-[11px] text-slate-400 font-bold">Chưa có bài bỏ</span>
+              <span className="text-[10px] sm:text-[11px] text-slate-400 font-bold">
+                {lang === 'en' ? 'No cards discarded' : 'Chưa có bài bỏ'}
+              </span>
             </div>
 
             <div className="w-full py-1 text-[9px] text-slate-500 uppercase font-semibold">
-              Sẵn sàng nhận bài
+              {lang === 'en' ? 'Ready for discards' : 'Sẵn sàng nhận bài'}
             </div>
           </div>
         ) : (

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { PendingAction, PlayerState } from '../../engine/types';
 import { CardRegistry } from '../../engine/CardRegistry';
 import { sound } from '../../engine/audio/SoundEffects';
@@ -16,7 +16,11 @@ export const NopeCountdown: React.FC<NopeCountdownProps> = ({
   onPlayNope,
   onPassNope
 }) => {
-  const [timeLeft, setTimeLeft] = useState<number>(3.5);
+  const rawTimeout = pendingAction.timeoutMs ? pendingAction.timeoutMs / 1000 : 5;
+  const totalDuration = Math.min(10, Math.max(2, rawTimeout));
+
+  const [timeLeft, setTimeLeft] = useState<number>(totalDuration);
+  const startTimeRef = useRef<number>(Date.now());
 
   const cardPlayed = pendingAction.cardsPlayed[0];
   const cardDef = cardPlayed ? CardRegistry.getCard(cardPlayed.defId) : null;
@@ -26,16 +30,20 @@ export const NopeCountdown: React.FC<NopeCountdownProps> = ({
 
   useEffect(() => {
     sound.playTicking();
+    startTimeRef.current = Date.now();
+    setTimeLeft(totalDuration);
+
     const interval = setInterval(() => {
-      const remaining = Math.max(0, (pendingAction.expiresAt - Date.now()) / 1000);
+      const elapsed = (Date.now() - startTimeRef.current) / 1000;
+      const remaining = Math.max(0, totalDuration - elapsed);
       setTimeLeft(remaining);
       if (remaining <= 0) {
         clearInterval(interval);
       }
-    }, 100);
+    }, 80);
 
     return () => clearInterval(interval);
-  }, [pendingAction.expiresAt]);
+  }, [cardPlayed?.uid, pendingAction.nopeCount, totalDuration]);
 
   const handleNopeClick = () => {
     if (nopeCard) {
@@ -98,7 +106,7 @@ export const NopeCountdown: React.FC<NopeCountdownProps> = ({
                 className="text-rose-500 transition-all duration-100"
                 fill="transparent"
                 strokeDasharray={251.2}
-                strokeDashoffset={251.2 * (1 - Math.min(1, timeLeft / 3.5))}
+                strokeDashoffset={251.2 * (1 - Math.min(1, timeLeft / totalDuration))}
                 strokeLinecap="round"
               />
             </svg>

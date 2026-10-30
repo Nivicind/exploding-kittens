@@ -666,11 +666,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       {/* SPOTLIGHT PHÓNG TO THẺ BÀI VỪA ĐÁNH GIỮA SÂN */}
       <ActionSpotlight data={spotlightData} lang={lang} />
 
-      {/* 1. Header (Cố định h-10 sm:h-11, 100% không vỡ dòng, co giãn linh hoạt) */}
-      <div className="h-10 sm:h-11 flex-shrink-0 flex items-center justify-between bg-slate-900/90 border border-slate-800 px-2 sm:px-3 py-1 rounded-xl shadow-md backdrop-blur-md z-30 overflow-hidden gap-1 sm:gap-2">
-        <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
-          <span className="text-base sm:text-lg">💣</span>
-          <h2 className="font-black text-[11px] sm:text-sm text-yellow-400 whitespace-nowrap">
+      {/* 1. Header (Cố định h-10 sm:h-11, 100% không vỡ dòng, co giãn linh hoạt, căn giữa tuyệt đối chống lệch khi đổi ngôn ngữ) */}
+      <div className="h-10 sm:h-11 flex-shrink-0 relative flex items-center justify-between bg-slate-900/90 border border-slate-800 px-2 sm:px-3 py-1 rounded-xl shadow-md backdrop-blur-md z-30 overflow-hidden gap-1 sm:gap-2">
+        {/* Bên trái: Logo và Tiêu đề Game */}
+        <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0 z-10 max-w-[28vw] sm:max-w-none">
+          <span className="text-base sm:text-lg flex-shrink-0">💣</span>
+          <h2 className="font-black text-[11px] sm:text-sm text-yellow-400 whitespace-nowrap truncate">
             {t('gameTitle')}
           </h2>
           <span className="text-[10px] text-slate-400 font-mono hidden md:inline ml-0.5">
@@ -678,11 +679,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           </span>
         </div>
 
-        <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-shrink">
+        {/* Ở giữa: Căn giữa tuyệt đối (Absolute Center) để không bao giờ bị lệch hay giật khi đổi ngôn ngữ Việt / Anh */}
+        <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1.5 sm:gap-2.5 z-10 pointer-events-auto">
           {/* Lượt hiện tại (Giới hạn độ rộng, chống tràn rớt dòng) */}
-          <div className="flex items-center gap-1 text-xs min-w-0">
+          <div className="flex items-center gap-1 text-xs">
             <span className="text-slate-400 text-[10px] sm:text-[11px] hidden md:inline whitespace-nowrap">{t('turnLabel')}</span>
-            <div className="font-black text-yellow-400 bg-slate-800 px-1.5 sm:px-2 py-0.5 rounded-lg border border-slate-700 text-[10px] sm:text-xs flex items-center gap-1 max-w-[80px] xs:max-w-[110px] sm:max-w-[160px] truncate whitespace-nowrap">
+            <div className="font-black text-yellow-400 bg-slate-800 px-1.5 sm:px-2 py-0.5 rounded-lg border border-slate-700 text-[10px] sm:text-xs flex items-center gap-1 max-w-[76px] xs:max-w-[100px] sm:max-w-[150px] truncate whitespace-nowrap">
               <span className="truncate">{currentPlayer?.name}</span>
               {currentPlayer?.turnsToTake > 1 && (
                 <span className="text-amber-400 flex-shrink-0">({currentPlayer.turnsToTake}L)</span>
@@ -700,7 +702,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           )}
         </div>
 
-        <div className="flex items-center gap-1 sm:gap-1.5 text-xs flex-shrink-0">
+        {/* Bên phải: Nút tiện ích & Thoát */}
+        <div className="flex items-center gap-1 sm:gap-1.5 text-xs flex-shrink-0 z-10">
           {/* Nút Xem Luật Chơi ❓ */}
           <button
             type="button"
@@ -712,11 +715,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             <span className="hidden md:inline">{lang === 'en' ? 'Rules' : 'Luật'}</span>
           </button>
 
-          {/* Nút chuyển đổi ngôn ngữ Song ngữ Việt - Anh */}
+          {/* Nút chuyển đổi ngôn ngữ Song ngữ Việt - Anh (Cố định độ rộng để chống lệch) */}
           <button
             type="button"
             onClick={handleToggleLang}
-            className="p-1 px-1.5 sm:px-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-black text-[10px] sm:text-[11px] transition cursor-pointer flex items-center gap-1 active:scale-95"
+            className="w-7 sm:w-14 p-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-black text-[10px] sm:text-[11px] transition cursor-pointer flex items-center justify-center gap-1 active:scale-95"
             title={lang === 'vi' ? 'Switch to English' : 'Chuyển sang Tiếng Việt'}
           >
             <span>{lang === 'vi' ? '🇻🇳' : '🇬🇧'}</span>
@@ -889,37 +892,36 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             <RealisticDiscardPile
               discardPile={state.discardPile}
               onOpenModal={() => setShowDiscardModal(true)}
+              lang={lang}
             />
 
             {/* B. BÊN PHẢI: TRỒNG BÀI BỐC (DRAW PILE) */}
             <div className="flex flex-col items-center justify-start flex-shrink-0">
-              {/* Trên xấp bài bốc: ghi rõ phần trăm nổ hoặc cảnh báo Mèo Tự Nổ ngửa mặt */}
-              <div className="mb-2 text-center flex flex-col items-center justify-center">
-                <span className="h-4 text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-300 block mb-0.5 leading-none">
+              {/* Trên xấp bài bốc: Header cao cố định h-10 sm:h-11 cân bằng hoàn hảo với bên Trồng Bài Bỏ */}
+              <div className="h-10 sm:h-11 mb-2 text-center flex flex-col items-center justify-end">
+                <span className="h-4 text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-300 block mb-0.5 leading-none whitespace-nowrap">
                   {lang === 'en' ? 'DRAW PILE' : 'TRỒNG BÀI BỐC'}
                 </span>
                 {isImplodingOnTop ? (
-                  <div className="h-5 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border border-purple-400 bg-purple-950/90 text-purple-200 text-[9px] sm:text-[10px] font-black shadow-[0_0_15px_rgba(168,85,247,0.7)] animate-pulse leading-none">
+                  <div className="h-5 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border border-purple-400 bg-purple-950/90 text-purple-200 text-[9px] sm:text-[10px] font-black shadow-[0_0_15px_rgba(168,85,247,0.7)] animate-pulse leading-none whitespace-nowrap">
                     <span>{t('implodingOnTopWarning')}</span>
                   </div>
                 ) : (
-                  <>
-                    <div className={`h-5 inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] sm:text-[10px] font-black leading-none ${
-                      dangerProb >= 35
-                        ? 'bg-rose-500/20 text-rose-300 border-rose-500/50 animate-pulse'
-                        : dangerProb >= 15
-                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/50'
-                        : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
-                    }`}>
-                      <span>💣 {lang === 'en' ? 'Explode:' : 'Nổ:'} {dangerProb.toFixed(1)}%</span>
-                      <span>({explodingKittensCount} bom / {state.drawPile.length} lá)</span>
-                    </div>
+                  <div className={`h-5 inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] sm:text-[10px] font-black leading-none whitespace-nowrap ${
+                    dangerProb >= 35
+                      ? 'bg-rose-500/20 text-rose-300 border-rose-500/50 animate-pulse'
+                      : dangerProb >= 15
+                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/50'
+                      : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
+                  }`}>
+                    <span>💣 {lang === 'en' ? 'Explode:' : 'Nổ:'} {dangerProb.toFixed(1)}%</span>
+                    <span className="text-slate-400">({explodingKittensCount}/{state.drawPile.length})</span>
                     {faceUpImplodingIndex > 0 && (
-                      <div className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-purple-500/60 bg-purple-950/70 text-purple-300 text-[8.5px] sm:text-[9.5px] font-black shadow-md leading-none animate-pulse">
-                        <span>{t('implodingCardsLeft')(faceUpImplodingIndex)}</span>
-                      </div>
+                      <span className="text-purple-300 font-bold ml-0.5 border-l border-slate-700 pl-1">
+                        🌀 #{faceUpImplodingIndex}
+                      </span>
                     )}
-                  </>
+                  </div>
                 )}
               </div>
 
