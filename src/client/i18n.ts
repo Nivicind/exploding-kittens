@@ -274,6 +274,133 @@ export const CARD_I18N: Record<string, { vi: CardI18n; en: CardI18n }> = {
       subName: 'Mèo Hoang',
       description: 'Wildcard cat. Can be used as any Cat card to form a 2-card or 3-card combo.'
     }
+  },
+  // BẢN MỞ RỘNG STREAKING KITTENS
+  streaking_kitten: {
+    vi: {
+      name: 'Mèo Khỏa Thân',
+      badge: 'KHỎA THÂN ⚡',
+      subName: 'Streaking Kitten',
+      description: 'Giữ lá này cho phép bạn bí mật giữ 1 lá Mèo Nổ trên tay mà không nổ. Nếu mất lá này, bạn nổ ngay! Nếu ai cướp phải Mèo Nổ của bạn, kẻ đó nổ!'
+    },
+    en: {
+      name: 'Streaking Kitten',
+      badge: 'STREAKING ⚡',
+      subName: 'Mèo Khỏa Thân',
+      description: 'While holding this, secretly hold 1 Exploding Kitten safely in hand! If stolen, thief explodes. If you lose this card while holding a bomb, you explode!'
+    }
+  },
+  super_skip: {
+    vi: {
+      name: 'Siêu Bỏ Lượt',
+      badge: 'SIÊU BỎ LƯỢT ⏩',
+      subName: 'Super Skip',
+      description: 'Hủy toàn bộ các lượt đi còn lại của bạn ngay lập tức mà không cần rút bài (hủy sạch các lượt dồn do bị Attack).'
+    },
+    en: {
+      name: 'Super Skip',
+      badge: 'SUPER SKIP ⏩',
+      subName: 'Siêu Bỏ Lượt',
+      description: 'End all of your turns immediately without drawing cards (cancels all stacked Attack turns).'
+    }
+  },
+  see_the_future_5x: {
+    vi: {
+      name: 'Xem Tương Lai 5X',
+      badge: 'TƯƠNG LAI 5X 🔮',
+      subName: 'See Future 5X',
+      description: 'Bí mật xem trộm 5 lá bài trên cùng của xấp bài rút mà không làm thay đổi thứ tự của chúng.'
+    },
+    en: {
+      name: 'See the Future 5X',
+      badge: 'FUTURE 5X 🔮',
+      subName: 'Xem Tương Lai 5X',
+      description: 'Privately view the top 5 cards in the Draw Pile without altering their order.'
+    }
+  },
+  alter_the_future_5x: {
+    vi: {
+      name: 'Đổi Tương Lai 5X',
+      badge: 'ĐỔI TƯƠNG LAI 5X 🌀',
+      subName: 'Alter Future 5X',
+      description: 'Bí mật xem trộm 5 lá bài trên cùng và được quyền kéo thả sắp xếp lại thứ tự cả 5 lá bài trước khi đặt lại.'
+    },
+    en: {
+      name: 'Alter the Future 5X',
+      badge: 'ALTER 5X 🌀',
+      subName: 'Đổi Tương Lai 5X',
+      description: 'Privately view the top 5 cards and rearrange them in any order before putting them back.'
+    }
+  },
+  swap_top_bottom: {
+    vi: {
+      name: 'Tráo Đỉnh Đáy',
+      badge: 'TRÁO ĐỈNH ĐÁY ↕️',
+      subName: 'Swap Top & Bottom',
+      description: 'Đổi vị trí lá bài trên đỉnh và lá bài dưới đáy xấp bài cho nhau mà không nhìn bài. Không kết thúc lượt.'
+    },
+    en: {
+      name: 'Swap Top & Bottom',
+      badge: 'SWAP T&B ↕️',
+      subName: 'Tráo Đỉnh Đáy',
+      description: 'Swap the top and bottom cards of the Draw Pile without looking. Does not end your turn.'
+    }
+  },
+  garbage_collection: {
+    vi: {
+      name: 'Thu Gom Rác',
+      badge: 'GOM RÁC 🚛',
+      subName: 'Garbage Collection',
+      description: 'Mọi người chơi còn sống (kể cả bạn) phải chọn 1 lá bài trên tay nhét vào xấp bài rút, sau đó xấp bài được xào lại.'
+    },
+    en: {
+      name: 'Garbage Collection',
+      badge: 'GARBAGE 🚛',
+      subName: 'Thu Gom Rác',
+      description: 'Every alive player (including you) must choose 1 card from hand into Draw Pile, then shuffle.'
+    }
+  },
+  catomic_bomb: {
+    vi: {
+      name: 'Bom Hạt Nhân Mèo',
+      badge: 'HẠT NHÂN ☢️',
+      subName: 'Catomic Bomb',
+      description: 'Lấy toàn bộ Mèo Nổ ra khỏi xấp bài, xào phần còn lại, rồi đặt toàn bộ bom lên đỉnh xấp bài! Kết thúc lượt ngay mà không rút bài.'
+    },
+    en: {
+      name: 'Catomic Bomb',
+      badge: 'CATOMIC ☢️',
+      subName: 'Bom Hạt Nhân Mèo',
+      description: 'Remove all Exploding Kittens from Draw Pile, shuffle the rest, place bombs back on top! End your turn without drawing.'
+    }
+  },
+  mark: {
+    vi: {
+      name: 'Đánh Dấu',
+      badge: 'ĐÁNH DẤU 👁️',
+      subName: 'Mark',
+      description: 'Chọn 1 đối thủ. Hệ thống ngẫu nhiên lật ngửa 1 lá bài trên tay họ cho cả bàn cùng thấy cho đến khi lá đó được đánh hoặc bị cướp.'
+    },
+    en: {
+      name: 'Mark',
+      badge: 'MARK 👁️',
+      subName: 'Đánh Dấu',
+      description: 'Target an opponent. Randomly reveal 1 card from their hand face-up to everyone until played or stolen.'
+    }
+  },
+  curse_of_cat_butt: {
+    vi: {
+      name: 'Lời Nguyền Mông Mèo',
+      badge: 'MÔNG MÈO 🍑',
+      subName: 'Curse of Cat Butt',
+      description: 'Nguyền rủa 1 đối thủ bị mù bài (toàn bộ bài úp thành 🍑). Họ phải đánh mò bài cho đến khi bốc bài an toàn để giải nguyền.'
+    },
+    en: {
+      name: 'Curse of the Cat Butt',
+      badge: 'CAT BUTT 🍑',
+      subName: 'Lời Nguyền Mông Mèo',
+      description: 'Make an opponent blind (hand turns into 🍑 and shuffled). They must play blindly until drawing safely.'
+    }
   }
 };
 

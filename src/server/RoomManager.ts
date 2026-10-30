@@ -519,6 +519,45 @@ export class RoomManager {
     this.triggerBotCycle(room);
   }
 
+  selectMarkTarget(roomId: string, playerId: string, targetPlayerId: string): void {
+    const room = this.getRoom(roomId);
+    if (!room || !room.state) return;
+
+    try {
+      GameStateManager.selectMarkTarget(room.state, playerId, targetPlayerId);
+      this.broadcastRoom(room);
+      this.triggerBotCycle(room);
+    } catch (e: any) {
+      this.emitErrorToPlayer(room, playerId, e.message);
+    }
+  }
+
+  selectCurseCatButtTarget(roomId: string, playerId: string, targetPlayerId: string): void {
+    const room = this.getRoom(roomId);
+    if (!room || !room.state) return;
+
+    try {
+      GameStateManager.selectCurseCatButtTarget(room.state, playerId, targetPlayerId);
+      this.broadcastRoom(room);
+      this.triggerBotCycle(room);
+    } catch (e: any) {
+      this.emitErrorToPlayer(room, playerId, e.message);
+    }
+  }
+
+  submitGarbageCard(roomId: string, playerId: string, cardUid: string): void {
+    const room = this.getRoom(roomId);
+    if (!room || !room.state) return;
+
+    try {
+      GameStateManager.submitGarbageCard(room.state, playerId, cardUid);
+      this.broadcastRoom(room);
+      this.triggerBotCycle(room);
+    } catch (e: any) {
+      this.emitErrorToPlayer(room, playerId, e.message);
+    }
+  }
+
   /**
    * Quản lý đếm ngược Autorun cho cửa sổ NOPE
    */
@@ -655,6 +694,39 @@ export class RoomManager {
             if (!room.state) return;
             const dec = ProbabilityBot.makeDecision(room.state, bot.id);
             this.insertImplodingKitten(room.id, bot.id, dec.insertIndex ?? 0);
+          }, reactionDelay);
+          return;
+        }
+      }
+
+      // Bot chọn mục tiêu Đánh Dấu (Mark)
+      if (pending.type === 'MARK_CHOOSE_PLAYER') {
+        const bot = room.players.find(p => p.id === pending.initiatorId && (p.isBot || p.disconnected));
+        if (bot) {
+          room.botLoopTimeout = setTimeout(() => {
+            if (!room.state) return;
+            const opponents = room.state.players.filter(p => p.isAlive && p.id !== bot.id && p.hand.length > 0);
+            if (opponents.length > 0) {
+              const target = opponents.sort((a, b) => b.hand.length - a.hand.length)[0];
+              this.selectMarkTarget(room.id, bot.id, target.id);
+            }
+          }, reactionDelay);
+          return;
+        }
+      }
+
+      // Bot chọn mục tiêu Lời Nguyền Mông Mèo (Curse of the Cat Butt)
+      if (pending.type === 'CURSE_CAT_BUTT_CHOOSE_PLAYER') {
+        const bot = room.players.find(p => p.id === pending.initiatorId && (p.isBot || p.disconnected));
+        if (bot) {
+          room.botLoopTimeout = setTimeout(() => {
+            if (!room.state) return;
+            const opponents = room.state.players.filter(p => p.isAlive && p.id !== bot.id && !p.isBlind);
+            const pool = opponents.length > 0 ? opponents : room.state.players.filter(p => p.isAlive && p.id !== bot.id);
+            if (pool.length > 0) {
+              const target = pool.sort((a, b) => b.hand.length - a.hand.length)[0];
+              this.selectCurseCatButtTarget(room.id, bot.id, target.id);
+            }
           }, reactionDelay);
           return;
         }

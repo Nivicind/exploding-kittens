@@ -14,12 +14,13 @@ export const RulesModal: React.FC<RulesModalProps> = ({
   onClose,
   lang = 'vi'
 }) => {
-  const [activeTab, setActiveTab] = useState<'basics' | 'cards' | 'combos' | 'imploding'>('basics');
+  const [activeTab, setActiveTab] = useState<'basics' | 'cards' | 'combos' | 'imploding' | 'streaking'>('basics');
 
   if (!isOpen) return null;
 
   const baseCards = CardRegistry.getAllCards(['base']);
   const implodingCards = CardRegistry.getAllCards(['imploding']);
+  const streakingCards = CardRegistry.getAllCards(['streaking']);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-3 sm:p-5 select-none animate-fade-in">
@@ -83,6 +84,15 @@ export const RulesModal: React.FC<RulesModalProps> = ({
             }`}
           >
             {lang === 'en' ? '4. Imploding Exp.' : '4. Mèo Tự Nổ 🌀'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('streaking')}
+            className={`flex-1 py-1.5 px-2 rounded-lg transition whitespace-nowrap cursor-pointer text-center ${
+              activeTab === 'streaking' ? 'bg-orange-600 text-white font-black' : 'text-orange-400 hover:text-orange-300'
+            }`}
+          >
+            {lang === 'en' ? '5. Streaking Exp.' : '5. Mèo Khỏa Thân ⚡'}
           </button>
         </div>
 
@@ -237,6 +247,63 @@ export const RulesModal: React.FC<RulesModalProps> = ({
                   <div className="space-y-0.5">
                     <div className="flex items-center gap-2">
                       <h4 className="font-black text-purple-300 text-xs sm:text-sm">
+                        {lang === 'en' ? def.nameEn : def.nameVi}
+                      </h4>
+                      <span className="text-[10px] text-slate-500 font-mono">
+                        ({lang === 'en' ? def.nameVi : def.nameEn})
+                      </span>
+                    </div>
+                    <p className="text-[11px] sm:text-xs text-slate-300">
+                      {CARD_I18N[def.id]?.[lang]?.description || def.description}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* TAB 5: MỞ RỘNG STREAKING KITTENS */}
+          {activeTab === 'streaking' && (
+            <div className="space-y-3 animate-fade-in">
+              <div className="bg-orange-950/40 border border-orange-500/40 p-3.5 rounded-2xl space-y-2">
+                <h4 className="font-black text-orange-400 text-xs sm:text-sm flex items-center gap-1.5">
+                  <span>⚡</span> {lang === 'en' ? 'Streaking Kittens Expansion Rules' : 'Luật Chơi Mở Rộng: Streaking Kittens'}
+                </h4>
+                <p>
+                  {lang === 'en'
+                    ? 'Streaking Kittens adds 8 wild official cards and increases the lethal bomb count from (N-1) to (N). One player can now secretly hold 1 Exploding Kitten safely in their hand!'
+                    : 'Streaking Kittens bổ sung 8 lá bài chính thức và nâng tổng số bom gây chết người từ (N - 1) lên đúng (N). Cho phép 1 người chơi bí mật ôm 1 quả bom Mèo Nổ an toàn trên tay!'}
+                </p>
+                <ul className="list-disc list-inside space-y-1 text-slate-300 pl-1">
+                  <li>
+                    <strong>{lang === 'en' ? 'Holding the Bomb:' : 'Bí mật ôm bom:'}</strong>{' '}
+                    {lang === 'en'
+                      ? 'If you have Streaking Kitten in hand and draw an Exploding Kitten, you secretly keep it! You do not explode and don\'t need a Defuse.'
+                      : 'Nếu bạn có lá Streaking Kitten trên tay và rút trúng Mèo Nổ, bạn bí mật giữ quả bom vào tay mình! Không bị nổ và không mất Defuse.'}
+                  </li>
+                  <li>
+                    <strong>{lang === 'en' ? 'Bomb Stolen:' : 'Bom bị cướp:'}</strong>{' '}
+                    {lang === 'en'
+                      ? 'If someone steals your Exploding Kitten, they explode immediately unless they have their own Streaking Kitten or a Defuse!'
+                      : 'Nếu có ai cướp phải Mèo Nổ trên tay bạn, kẻ cướp sẽ nổ ngay lập tức nếu không có lá Streaking Kitten hoặc Defuse!'}
+                  </li>
+                  <li>
+                    <strong>{lang === 'en' ? 'Losing Streaking Kitten:' : 'Bị mất Streaking Kitten:'}</strong>{' '}
+                    {lang === 'en'
+                      ? 'If someone steals or discards your Streaking Kitten while you hold a bomb, you explode immediately unless you have a Defuse!'
+                      : 'Nếu bạn bị cướp mất lá Streaking Kitten trong khi đang ôm Mèo Nổ, bạn nổ tung ngay lập tức trừ khi có Defuse!'}
+                  </li>
+                </ul>
+              </div>
+
+              {streakingCards.map(def => (
+                <div key={def.id} className="bg-slate-950/80 border border-orange-500/30 p-3 rounded-2xl flex items-start gap-3">
+                  <span className="text-2xl sm:text-3xl flex-shrink-0 p-1.5 bg-slate-900 rounded-xl border border-slate-800">
+                    {def.icon}
+                  </span>
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-black text-orange-300 text-xs sm:text-sm">
                         {lang === 'en' ? def.nameEn : def.nameVi}
                       </h4>
                       <span className="text-[10px] text-slate-500 font-mono">

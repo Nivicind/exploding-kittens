@@ -164,6 +164,21 @@ io.on('connection', socket => {
     roomManager.selectTargetedAttack(roomId, playerId, targetPlayerId);
   });
 
+  // Chọn mục tiêu Đánh Dấu (Mark)
+  socket.on('select_mark_target', ({ roomId, playerId, targetPlayerId }) => {
+    roomManager.selectMarkTarget(roomId, playerId, targetPlayerId);
+  });
+
+  // Chọn mục tiêu Lời Nguyền Mông Mèo (Curse of the Cat Butt)
+  socket.on('select_curse_cat_butt_target', ({ roomId, playerId, targetPlayerId }) => {
+    roomManager.selectCurseCatButtTarget(roomId, playerId, targetPlayerId);
+  });
+
+  // Nộp bài vào Xe Thu Gom Rác (Garbage Collection)
+  socket.on('submit_garbage_card', ({ roomId, playerId, cardUid }) => {
+    roomManager.submitGarbageCard(roomId, playerId, cardUid);
+  });
+
   // Rút bài từ đáy (Draw from Bottom)
   socket.on('draw_bottom', ({ roomId, playerId }) => {
     roomManager.drawFromBottom(roomId, playerId);

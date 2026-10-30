@@ -16,6 +16,7 @@ import { ComboTargetModal } from './ComboTargetModal';
 import { DiscardPileModal } from './DiscardPileModal';
 import { ImplodingInsertModal } from './ImplodingInsertModal';
 import { AlterFutureModal } from './AlterFutureModal';
+import { GarbageCollectionModal } from './GarbageCollectionModal';
 import { RulesModal } from './RulesModal';
 import { GameLog } from './GameLog';
 import { sound } from '../../engine/audio/SoundEffects';
@@ -38,6 +39,9 @@ interface GameBoardProps {
   onCloseAlterFuture?: () => void;
   onSelectTargetedAttack?: (targetPlayerId: string) => void;
   onDrawBottom?: () => void;
+  onSelectMarkTarget?: (targetPlayerId: string) => void;
+  onSelectCurseCatButtTarget?: (targetPlayerId: string) => void;
+  onSubmitGarbageCard?: (cardUid: string) => void;
   lang?: Language;
   onToggleLang?: () => void;
 }
@@ -59,6 +63,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   onCloseAlterFuture,
   onSelectTargetedAttack,
   onDrawBottom,
+  onSelectMarkTarget,
+  onSelectCurseCatButtTarget,
+  onSubmitGarbageCard,
   lang: langProp,
   onToggleLang: onToggleLangProp
 }) => {
@@ -79,7 +86,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
   const [showDiscardModal, setShowDiscardModal] = useState<boolean>(false);
   const [comboTargetModalData, setComboTargetModalData] = useState<{
-    mode: 'FAVOR_TARGET' | 'COMBO_TWO' | 'COMBO_THREE' | 'TARGETED_ATTACK';
+    mode: 'FAVOR_TARGET' | 'COMBO_TWO' | 'COMBO_THREE' | 'TARGETED_ATTACK' | 'MARK_TARGET' | 'CURSE_CAT_BUTT_TARGET';
     cardUids: string[];
   } | null>(null);
 
@@ -570,6 +577,24 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           cardUids: [cardUid]
         });
       }
+    } else if (defId === 'mark') {
+      if (aliveOpponents.length === 1) {
+        onPlayCards([cardUid], { targetPlayerId: aliveOpponents[0].id });
+      } else {
+        setComboTargetModalData({
+          mode: 'MARK_TARGET',
+          cardUids: [cardUid]
+        });
+      }
+    } else if (defId === 'curse_of_cat_butt') {
+      if (aliveOpponents.length === 1) {
+        onPlayCards([cardUid], { targetPlayerId: aliveOpponents[0].id });
+      } else {
+        setComboTargetModalData({
+          mode: 'CURSE_CAT_BUTT_TARGET',
+          cardUids: [cardUid]
+        });
+      }
     } else {
       onPlayCards([cardUid]);
     }
@@ -897,6 +922,28 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                     {t('isTurnTag')} {opp.turnsToTake > 1 ? `(${opp.turnsToTake}L)` : ''}
                   </span>
                 ) : null}
+
+                {/* Huy hiệu Bị Mù (Curse of Cat Butt) 🍑 */}
+                {opp.isBlind && (
+                  <span className="text-[6px] sm:text-[7.5px] uppercase font-black px-1.5 py-0.5 rounded-full bg-pink-950 border border-pink-500 text-pink-300 flex items-center justify-center gap-0.5 whitespace-nowrap truncate max-w-full my-0.5">
+                    <span>🍑</span> {lang === 'en' ? 'Blind' : 'Bị mù'}
+                  </span>
+                )}
+
+                {/* Hiển thị các lá bài bị lật ngửa công khai do Mark 👁️ */}
+                {opp.hand.filter(c => c.isMarked).map(markedCard => {
+                  const cardDef = CardRegistry.getCard(markedCard.defId);
+                  return (
+                    <div
+                      key={markedCard.uid}
+                      className="px-1 py-0.5 rounded bg-amber-500 text-slate-950 font-black text-[6.5px] sm:text-[7.5px] flex items-center gap-0.5 shadow-md border border-yellow-200 animate-pulse truncate max-w-full my-0.5"
+                      title={lang === 'en' ? `Revealed: ${cardDef?.nameEn}` : `Bài lộ: ${cardDef?.nameVi}`}
+                    >
+                      <span>👁️</span>
+                      <span className="truncate">{cardDef?.icon} {lang === 'en' ? cardDef?.nameEn : cardDef?.nameVi}</span>
+                    </div>
+                  );
+                })}
               </div>
             );
           })}
@@ -1222,6 +1269,39 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         />
       )}
 
+      {/* Hộp thoại Chọn Mục Tiêu cho Đánh Dấu (Mark) */}
+      {state.pendingAction?.type === 'MARK_CHOOSE_PLAYER' && state.pendingAction.initiatorId === myPlayerId && (
+        <ComboTargetModal
+          mode="MARK_TARGET"
+          opponents={aliveOpponents}
+          onConfirmTarget={(targetPlayerId) => onSelectMarkTarget && onSelectMarkTarget(targetPlayerId)}
+          lang={lang}
+        />
+      )}
+
+      {/* Hộp thoại Chọn Mục Tiêu cho Lời Nguyền Mông Mèo (Curse of the Cat Butt) */}
+      {state.pendingAction?.type === 'CURSE_CAT_BUTT_CHOOSE_PLAYER' && state.pendingAction.initiatorId === myPlayerId && (
+        <ComboTargetModal
+          mode="CURSE_CAT_BUTT_TARGET"
+          opponents={aliveOpponents}
+          onConfirmTarget={(targetPlayerId) => onSelectCurseCatButtTarget && onSelectCurseCatButtTarget(targetPlayerId)}
+          lang={lang}
+        />
+      )}
+
+      {/* Hộp thoại Xe Thu Gom Rác (Garbage Collection) */}
+      {state.pendingAction?.type === 'GARBAGE_COLLECTION' && myPlayer && myPlayer.isAlive && myPlayer.hand.length > 0 && (
+        <GarbageCollectionModal
+          isOpen={true}
+          myHand={myPlayer.hand}
+          hasSubmitted={!!state.pendingAction.garbagePicks?.[myPlayerId]}
+          totalEligible={state.players.filter(p => p.isAlive && p.hand.length > 0).length}
+          submittedCount={Object.keys(state.pendingAction.garbagePicks || {}).length}
+          onSubmit={(cardUid) => onSubmitGarbageCard && onSubmitGarbageCard(cardUid)}
+          lang={lang}
+        />
+      )}
+
       {/* Hộp thoại Đặt Lại Mèo Tự Nổ (Imploding Kitten) ngửa mặt */}
       {state.pendingAction?.type === 'IMPLODING_INSERTION' && state.pendingAction.initiatorId === myPlayerId && (
         <ImplodingInsertModal
@@ -1234,11 +1314,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         />
       )}
 
-      {/* Hộp thoại Thay Đổi Tương Lai (Alter the Future 3X) */}
+      {/* Hộp thoại Thay Đổi Tương Lai (Alter the Future 3X hoặc 5X) */}
       {((state.pendingAction?.type === 'ALTER_THE_FUTURE' && state.pendingAction.initiatorId === myPlayerId) || 
         (state.alterCards && state.alterCards.playerId === myPlayerId)) && (
         <AlterFutureModal
-          cards={state.alterCards?.cards || state.pendingAction?.alterCards || state.drawPile.slice(0, 3)}
+          cards={state.alterCards?.cards || state.pendingAction?.alterCards || state.drawPile.slice(0, state.pendingAction?.cardsPlayed[0]?.defId === 'alter_the_future_5x' ? 5 : 3)}
           onConfirm={(reordered) => onReorderAlterFuture && onReorderAlterFuture(reordered)}
           onClose={() => onCloseAlterFuture && onCloseAlterFuture()}
           lang={lang}

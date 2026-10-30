@@ -1,6 +1,7 @@
 import { CardDefinition } from './types';
 import { BASE_GAME_CARDS } from './packs/BaseGamePack';
 import { IMPLODING_KITTENS_CARDS } from './packs/ImplodingKittensPack';
+import { STREAKING_KITTENS_CARDS } from './packs/StreakingKittensPack';
 
 export class CardRegistry {
   private static cards: Map<string, CardDefinition> = new Map();
@@ -14,6 +15,8 @@ export class CardRegistry {
     this.registerPack('base', 'Bộ Mèo Nổ Gốc (Original Edition)', BASE_GAME_CARDS);
     // Đăng ký Imploding Kittens Pack
     this.registerPack('imploding', 'Mở Rộng: Mèo Tự Nổ (Imploding Kittens)', IMPLODING_KITTENS_CARDS);
+    // Đăng ký Streaking Kittens Pack
+    this.registerPack('streaking', 'Mở Rộng: Mèo Khỏa Thân (Streaking Kittens)', STREAKING_KITTENS_CARDS);
   }
 
   static registerPack(packId: string, packName: string, cards: CardDefinition[]) {

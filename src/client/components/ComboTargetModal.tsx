@@ -5,7 +5,7 @@ import { CardView } from './CardView';
 import { Language } from '../i18n';
 
 interface ComboTargetModalProps {
-  mode: 'FAVOR_TARGET' | 'COMBO_TWO' | 'COMBO_THREE' | 'GIVE_FAVOR_CARD' | 'TARGETED_ATTACK';
+  mode: 'FAVOR_TARGET' | 'COMBO_TWO' | 'COMBO_THREE' | 'GIVE_FAVOR_CARD' | 'TARGETED_ATTACK' | 'MARK_TARGET' | 'CURSE_CAT_BUTT_TARGET';
   opponents?: PlayerState[];
   myHand?: PlayerState['hand'];
   initiatorName?: string;
@@ -29,8 +29,8 @@ export const ComboTargetModal: React.FC<ComboTargetModalProps> = ({
   const [selectedCardDefId, setSelectedCardDefId] = useState<string>('defuse');
   const [selectedMyCardUid, setSelectedMyCardUid] = useState<string>(myHand[0]?.uid || '');
 
-  // Toàn bộ các định nghĩa bài có thể đòi (cho Combo 3) - hỗ trợ cả bản gốc và mở rộng Imploding
-  const availableDefs = CardRegistry.getAllCards(['base', 'imploding']);
+  // Toàn bộ các định nghĩa bài có thể đòi (cho Combo 3) - hỗ trợ cả bản gốc, Imploding và Streaking
+  const availableDefs = CardRegistry.getAllCards(['base', 'imploding', 'streaking']);
 
   // Trường hợp nạn nhân phải chọn 1 lá bài trên tay để đưa (GIVE_FAVOR_CARD)
   if (mode === 'GIVE_FAVOR_CARD') {
@@ -80,6 +80,10 @@ export const ComboTargetModal: React.FC<ComboTargetModalProps> = ({
   // Tiêu đề tương ứng với mode
   const title = mode === 'TARGETED_ATTACK'
     ? (lang === 'en' ? 'Targeted Attack 2X: Choose Target' : 'Tấn Công Có Mục Tiêu (Targeted Attack 2X)')
+    : mode === 'MARK_TARGET'
+    ? (lang === 'en' ? 'Mark: Choose Opponent to Reveal Card' : 'Đánh Dấu (Mark): Chọn Đối Thủ Để Lật Ngửa Bài')
+    : mode === 'CURSE_CAT_BUTT_TARGET'
+    ? (lang === 'en' ? 'Curse of Cat Butt: Choose Victim' : 'Lời Nguyền Mông Mèo: Chọn Đối Thủ Bị Nguyền Mù')
     : mode === 'FAVOR_TARGET' 
     ? (lang === 'en' ? 'Favor: Choose Player to Ask' : 'Chọn Người Chơi Để Xin Bài (Favor)')
     : mode === 'COMBO_TWO' 
@@ -88,18 +92,26 @@ export const ComboTargetModal: React.FC<ComboTargetModalProps> = ({
 
   const subtitle = mode === 'TARGETED_ATTACK'
     ? (lang === 'en' ? 'The selected player will immediately take 2 turns in a row!' : 'Người chơi được chọn sẽ lập tức bị ép đi 2 lượt liên tiếp!')
+    : mode === 'MARK_TARGET'
+    ? (lang === 'en' ? '1 random card from their hand will be publicly revealed to everyone!' : '1 lá bài ngẫu nhiên trên tay họ sẽ bị lật ngửa công khai cho tất cả mọi người cùng thấy!')
+    : mode === 'CURSE_CAT_BUTT_TARGET'
+    ? (lang === 'en' ? 'Their hand will be blinded (🍑) and shuffled until they draw safely!' : 'Toàn bộ bài trên tay họ sẽ bị úp mù (🍑) và xáo trộn cho đến khi bốc bài an toàn!')
     : mode === 'COMBO_THREE'
     ? (lang === 'en' ? 'If they have the named card, they must give it to you. If not, you get nothing!' : 'Nếu mục tiêu có lá bài bạn gọi tên, họ bắt buộc phải đưa cho bạn. Nếu không, bạn nhận số 0!')
     : (lang === 'en' ? 'Choose 1 living opponent to target.' : 'Chọn 1 đối thủ còn sống để thực thi hành động.');
 
+  const icon = mode === 'MARK_TARGET' ? '👁️' : mode === 'CURSE_CAT_BUTT_TARGET' ? '🍑' : '🎯';
+  const borderColor = mode === 'MARK_TARGET' ? 'border-amber-400' : mode === 'CURSE_CAT_BUTT_TARGET' ? 'border-pink-500' : mode === 'TARGETED_ATTACK' ? 'border-orange-500 shadow-orange-950/80' : 'border-yellow-400';
+  const headerColor = mode === 'MARK_TARGET' ? 'text-amber-400' : mode === 'CURSE_CAT_BUTT_TARGET' ? 'text-pink-400' : mode === 'TARGETED_ATTACK' ? 'text-orange-400' : 'text-yellow-400';
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-fade-in select-none">
-      <div className={`bg-slate-900 border-4 ${mode === 'TARGETED_ATTACK' ? 'border-orange-500 shadow-orange-950/80' : 'border-yellow-400'} rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl text-center space-y-6`}>
+      <div className={`bg-slate-900 border-4 ${borderColor} rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl text-center space-y-6`}>
         <div>
-          <div className={`w-16 h-16 ${mode === 'TARGETED_ATTACK' ? 'bg-orange-500/20 border-orange-500' : 'bg-yellow-400/20 border-yellow-400'} border-2 rounded-full flex items-center justify-center mx-auto text-3xl mb-2`}>
-            {mode === 'TARGETED_ATTACK' ? '🎯' : '🎯'}
+          <div className={`w-16 h-16 ${mode === 'CURSE_CAT_BUTT_TARGET' ? 'bg-pink-500/20 border-pink-500' : mode === 'MARK_TARGET' ? 'bg-amber-500/20 border-amber-500' : mode === 'TARGETED_ATTACK' ? 'bg-orange-500/20 border-orange-500' : 'bg-yellow-400/20 border-yellow-400'} border-2 rounded-full flex items-center justify-center mx-auto text-3xl mb-2`}>
+            {icon}
           </div>
-          <h3 className={`text-xl sm:text-2xl font-black ${mode === 'TARGETED_ATTACK' ? 'text-orange-400' : 'text-yellow-400'} uppercase tracking-wide`}>
+          <h3 className={`text-xl sm:text-2xl font-black ${headerColor} uppercase tracking-wide`}>
             {title}
           </h3>
           <p className="text-xs sm:text-sm text-slate-300 mt-1">

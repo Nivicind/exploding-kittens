@@ -42,32 +42,30 @@ export const AlterFutureModal: React.FC<AlterFutureModalProps> = ({
         <div>
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-500/20 border border-purple-400/50 text-purple-300 text-xs font-black uppercase tracking-wider mb-2">
             <span>🔮</span>
-            <span>{lang === 'en' ? 'ALTER THE FUTURE 3X' : 'THAY ĐỔI TƯƠNG LAI 3X'}</span>
+            <span>{lang === 'en' ? `ALTER THE FUTURE ${items.length}X` : `THAY ĐỔI TƯƠNG LAI ${items.length}X`}</span>
           </div>
           <h3 className="text-xl sm:text-2xl font-black text-purple-400 uppercase tracking-wide">
-            {lang === 'en' ? 'Rearrange Top 3 Cards' : 'Sắp Xếp Lại 3 Lá Trên Cùng'}
+            {lang === 'en' ? `Rearrange Top ${items.length} Cards` : `Sắp Xếp Lại ${items.length} Lá Trên Cùng`}
           </h3>
           <p className="text-[11px] sm:text-xs text-slate-300 mt-1">
             {lang === 'en' 
-              ? 'Drag and drop or use arrows to rearrange the top 3 cards in the draw pile:' 
-              : 'Kéo thả hoặc bấm nút mũi tên để hoán đổi thứ tự 3 lá trên cùng của xấp bài rút:'}
+              ? `Drag and drop or use arrows to rearrange the top ${items.length} cards in the draw pile:` 
+              : `Kéo thả hoặc bấm nút mũi tên để hoán đổi thứ tự ${items.length} lá trên cùng của xấp bài rút:`}
           </p>
         </div>
 
-        {/* Khung Kéo Thả 3 lá bài (Reorder Group) */}
+        {/* Khung Kéo Thả các lá bài (Reorder Group) */}
         <Reorder.Group
           axis="x"
           values={items}
           onReorder={setItems}
-          className="flex items-center justify-center gap-2.5 sm:gap-4 py-3 overflow-x-auto"
+          className="flex items-center justify-start sm:justify-center gap-2.5 sm:gap-4 py-3 overflow-x-auto max-w-full px-2"
         >
           {items.map((card, idx) => {
             const isTop = idx === 0;
             const slotTitle = isTop
               ? (lang === 'en' ? '🥇 TOP (1ST)' : '🥇 ĐỈNH (LÁ 1)')
-              : idx === 1
-              ? (lang === 'en' ? '🥈 2ND' : '🥈 LÁ THỨ 2')
-              : (lang === 'en' ? '🥉 3RD' : '🥉 LÁ THỨ 3');
+              : (lang === 'en' ? `Card ${idx + 1}` : `Lá thứ ${idx + 1}`);
 
             return (
               <Reorder.Item

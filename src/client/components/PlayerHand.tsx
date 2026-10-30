@@ -75,9 +75,9 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
     NOPE: 12,
   };
 
-  // Danh sách bài hiển thị (được sắp xếp theo cặp/loại hoặc giữ nguyên theo tùy chọn)
+  // Danh sách bài hiển thị (được sắp xếp theo cặp/loại hoặc giữ nguyên theo tùy chọn, khi bị Mù không được xếp)
   const displayCards = React.useMemo(() => {
-    if (!isSorted) return player.hand;
+    if (player.isBlind || !isSorted) return player.hand;
     return [...player.hand].sort((a, b) => {
       const defA = CardRegistry.getCard(a.defId);
       const defB = CardRegistry.getCard(b.defId);
@@ -86,7 +86,7 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
       if (orderA !== orderB) return orderA - orderB;
       return a.defId.localeCompare(b.defId);
     });
-  }, [player.hand, isSorted]);
+  }, [player.hand, isSorted, player.isBlind]);
 
   // Tự động lọc bỏ các UID bài đã bị mất / bị cướp / đã đánh ra khỏi tay
   useEffect(() => {
@@ -110,6 +110,13 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
 
     // Nếu đang trong chế độ chọn bài để đưa cho người xin (Favor)
     if (isGiveFavorMode) {
+      sound.playCardPlay();
+      setSelectedUids([card.uid]);
+      return;
+    }
+
+    // Nếu người chơi đang bị Mù (Curse of Cat Butt), chỉ được chọn 1 lá mò duy nhất
+    if (player.isBlind) {
       sound.playCardPlay();
       setSelectedUids([card.uid]);
       return;
@@ -143,27 +150,27 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
 
   if (count === 1) {
     singleCardDef = CardRegistry.getCard(selectedCards[0].defId);
-    // Cho phép đánh đơn lá bài chức năng, lá Nope hoặc đánh lẻ 1 lá mèo
-    if (singleCardDef && singleCardDef.type !== 'DEFUSE' && singleCardDef.type !== 'KITTEN') {
+    // Cho phép đánh đơn lá bài chức năng, lá Nope hoặc đánh lẻ 1 lá mèo, HOẶC khi bị mù được đánh mò bất kỳ lá nào
+    if (player.isBlind || (singleCardDef && singleCardDef.type !== 'DEFUSE' && singleCardDef.type !== 'KITTEN')) {
       canPlaySingle = true;
     }
-  } else if (count === 2) {
+  } else if (!player.isBlind && count === 2) {
     if (GameStateManager.isValidComboTwo(selectedCards)) {
       canPlayComboTwo = true;
     }
-  } else if (count === 3) {
+  } else if (!player.isBlind && count === 3) {
     if (GameStateManager.isValidComboThree(selectedCards)) {
       canPlayComboThree = true;
     }
-  } else if (count === 5) {
+  } else if (!player.isBlind && count === 5) {
     const uniqueDefs = new Set(selectedCards.map(c => c.defId));
     if (uniqueDefs.size === 5) {
       canPlayComboFive = true;
     }
   }
 
-  // Nhận biết hành động không có tác dụng: Đánh Nope ngoài cửa sổ Nope hoặc đánh lẻ 1 lá mèo
-  const isSelectedPlayIneffective = count === 1 && (
+  // Nhận biết hành động không có tác dụng: Đánh Nope ngoài cửa sổ Nope hoặc đánh lẻ 1 lá mèo (khi bị mù thì không cảnh báo)
+  const isSelectedPlayIneffective = !player.isBlind && count === 1 && (
     selectedCards[0].defId === 'nope' ? !isNopeWindow : singleCardDef?.type === 'CAT'
   );
 
@@ -281,13 +288,19 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
             <button
               onClick={() => executePlay(false)}
               className={`py-1 px-3 text-slate-950 font-black text-[11px] uppercase rounded-xl shadow-md transition flex items-center gap-1 ${
-                isSelectedPlayIneffective
+                player.isBlind
+                  ? 'bg-pink-400 hover:bg-pink-300 text-slate-950'
+                  : isSelectedPlayIneffective
                   ? 'bg-amber-400 hover:bg-amber-300 text-slate-950'
                   : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950'
               }`}
             >
               {isSelectedPlayIneffective && <span>⚠️</span>}
-              <span>{UI_TEXT[lang].playCardBtn(singleCardName)}</span>
+              <span>
+                {player.isBlind 
+                  ? (lang === 'en' ? '🍑 PLAY BLIND CARD' : '🍑 ĐÁNH MÒ LÁ NÀY') 
+                  : UI_TEXT[lang].playCardBtn(singleCardName)}
+              </span>
             </button>
           )}
 
@@ -430,6 +443,7 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
                 <CardView
                   card={card}
                   lang={lang}
+                  isBlind={player.isBlind}
                   isSelected={isSelected}
                   onClick={() => handleCardClick(card)}
                   disabled={disabled && !showNopeGlow && !isGiveFavorMode}

@@ -26,12 +26,19 @@ export const CustomDeckModal: React.FC<CustomDeckModalProps> = ({
     return config?.activeExpansions ? config.activeExpansions.includes('imploding') : false;
   });
 
-  const activePacks = hasImploding ? ['base', 'imploding'] : ['base'];
+  const [hasStreaking, setHasStreaking] = useState<boolean>(() => {
+    return config?.activeExpansions ? config.activeExpansions.includes('streaking') : false;
+  });
+
+  const activePacks: string[] = ['base'];
+  if (hasImploding) activePacks.push('imploding');
+  if (hasStreaking) activePacks.push('streaking');
+
   const allCards = CardRegistry.getAllCards(activePacks).filter(
     c => c.type !== 'KITTEN' && c.type !== 'DEFUSE'
   );
 
-  const totalBombs = Math.max(1, playerCount - 1);
+  const totalBombs = hasStreaking ? playerCount : Math.max(1, playerCount - 1);
   const defaultHandSize = playerCount <= 5 ? 7 : 4;
   const [handSize, setHandSize] = useState<number>(config?.handSize ?? defaultHandSize);
   const [defuseInDeck, setDefuseInDeck] = useState<number>(config?.defuseInDeck ?? 2);
@@ -57,15 +64,23 @@ export const CustomDeckModal: React.FC<CustomDeckModalProps> = ({
 
   const totalRegularCards = allCards.reduce((acc, c) => acc + (cardCounts[c.id] ?? c.defaultCount), 0);
 
-  const handleToggleExpansion = () => {
+  const handleToggleImploding = () => {
     const nextHasImploding = !hasImploding;
     setHasImploding(nextHasImploding);
 
-    // Tự động điều chỉnh số lượng bom phù hợp (tổng luôn bằng totalBombs)
     if (nextHasImploding) {
       setImplodingKittensCount(Math.min(1, totalBombs));
     } else {
       setImplodingKittensCount(0);
+    }
+  };
+
+  const handleToggleStreaking = () => {
+    const nextHasStreaking = !hasStreaking;
+    setHasStreaking(nextHasStreaking);
+    const nextTotalBombs = nextHasStreaking ? playerCount : Math.max(1, playerCount - 1);
+    if (hasImploding) {
+      setImplodingKittensCount(prev => Math.min(prev, nextTotalBombs));
     }
   };
 
@@ -79,6 +94,7 @@ export const CustomDeckModal: React.FC<CustomDeckModalProps> = ({
 
   const handleReset = () => {
     setHasImploding(false);
+    setHasStreaking(false);
     setHandSize(playerCount <= 5 ? 7 : 4);
     setDefuseInDeck(2);
     setImplodingKittensCount(0);
@@ -99,7 +115,7 @@ export const CustomDeckModal: React.FC<CustomDeckModalProps> = ({
       cardCounts,
       explodingKittensCount: finalExploding,
       implodingKittensCount: finalImploding,
-      activeExpansions: hasImploding ? ['base', 'imploding'] : ['base']
+      activeExpansions: activePacks
     });
     onClose();
   };
@@ -131,7 +147,7 @@ export const CustomDeckModal: React.FC<CustomDeckModalProps> = ({
         <div className="overflow-y-auto flex-1 my-3 pr-1 sm:pr-2 space-y-4">
           {/* BANNER BẬT/TẮT BẢN MỞ RỘNG IMPLODING KITTENS */}
           <div 
-            onClick={handleToggleExpansion}
+            onClick={handleToggleImploding}
             className={`p-3.5 sm:p-4 rounded-2xl border transition cursor-pointer flex items-center justify-between gap-3 shadow-lg select-none ${
               hasImploding
                 ? 'bg-gradient-to-r from-purple-950/80 to-slate-900 border-purple-500 shadow-purple-950/50'
@@ -159,6 +175,40 @@ export const CustomDeckModal: React.FC<CustomDeckModalProps> = ({
 
             {/* Switch Toggle */}
             <div className={`w-12 h-6 sm:w-14 sm:h-7 rounded-full p-0.5 sm:p-1 flex items-center transition flex-shrink-0 ${hasImploding ? 'bg-purple-600 justify-end' : 'bg-slate-800 justify-start'}`}>
+              <div className="w-5 h-5 bg-white rounded-full shadow-md transform transition" />
+            </div>
+          </div>
+
+          {/* BANNER BẬT/TẮT BẢN MỞ RỘNG STREAKING KITTENS */}
+          <div 
+            onClick={handleToggleStreaking}
+            className={`p-3.5 sm:p-4 rounded-2xl border transition cursor-pointer flex items-center justify-between gap-3 shadow-lg select-none ${
+              hasStreaking
+                ? 'bg-gradient-to-r from-orange-950/80 to-slate-900 border-orange-500 shadow-orange-950/50'
+                : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+            }`}
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="text-3xl animate-bounce-short">⚡</span>
+              <div>
+                <div className="flex items-center gap-2 font-black text-xs sm:text-sm text-orange-300">
+                  <span>{lang === 'en' ? 'Expansion: Streaking Kittens 🐱⚡' : 'Bản Mở Rộng: Streaking Kittens 🐱⚡'}</span>
+                  {hasStreaking && (
+                    <span className="px-2 py-0.5 rounded-full bg-orange-500 text-slate-950 font-black text-[9px] uppercase tracking-wider">
+                      {lang === 'en' ? 'ACTIVE' : 'ĐANG BẬT'}
+                    </span>
+                  )}
+                </div>
+                <p className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5">
+                  {lang === 'en'
+                    ? 'Adds 8 official cards: Streaking Kitten, Super Skip, See Future 5X, Alter Future 5X, Swap Top/Bottom, Catomic Bomb, Mark, Curse of Cat Butt.'
+                    : 'Tích hợp 8 lá bài chính thức: Mèo Khỏa Thân, Siêu Bỏ Lượt, Xem Tương Lai 5X, Đổi Tương Lai 5X, Tráo Đỉnh Đáy, Bom Hạt Nhân, Đánh Dấu, Lời Nguyền Mông Mèo.'}
+                </p>
+              </div>
+            </div>
+
+            {/* Switch Toggle */}
+            <div className={`w-12 h-6 sm:w-14 sm:h-7 rounded-full p-0.5 sm:p-1 flex items-center transition flex-shrink-0 ${hasStreaking ? 'bg-orange-600 justify-end' : 'bg-slate-800 justify-start'}`}>
               <div className="w-5 h-5 bg-white rounded-full shadow-md transform transition" />
             </div>
           </div>
@@ -210,9 +260,13 @@ export const CustomDeckModal: React.FC<CustomDeckModalProps> = ({
                     {lang === 'en' ? 'Lethal Bomb Count (Fixed Rule)' : 'Số Lượng Bom (Cố Định Chuẩn Luật)'}
                   </h4>
                   <p className="text-[10px] text-slate-400">
-                    {lang === 'en' 
-                      ? `Total lethal bombs is strictly fixed = ${playerCount} - 1 = ${totalBombs} cards to ensure 1 sole winner.` 
-                      : `Tổng số bom bắt buộc cố định = ${playerCount} - 1 = ${totalBombs} lá để luôn tìm ra duy nhất 1 người thắng.`}
+                    {hasStreaking
+                      ? (lang === 'en'
+                          ? `With Streaking Kittens, total lethal bombs = ${playerCount} cards (1 player can secretly hold a bomb).`
+                          : `Khi bật Streaking Kittens, tổng số bom = ${playerCount} lá (vì 1 người có thể ôm bom an toàn).`)
+                      : (lang === 'en' 
+                          ? `Total lethal bombs is strictly fixed = ${playerCount} - 1 = ${totalBombs} cards to ensure 1 sole winner.` 
+                          : `Tổng số bom bắt buộc cố định = ${playerCount} - 1 = ${totalBombs} lá để luôn tìm ra duy nhất 1 người thắng.`)}
                   </p>
                 </div>
               </div>

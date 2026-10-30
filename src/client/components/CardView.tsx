@@ -11,6 +11,7 @@ interface CardViewProps {
   isCompact?: boolean;
   disabled?: boolean;
   highlight?: boolean;
+  isBlind?: boolean;
   className?: string;
   style?: React.CSSProperties;
   lang?: Language;
@@ -18,25 +19,34 @@ interface CardViewProps {
 
 // Bảng màu Full-Color nguyên bản của Exploding Kittens
 const CARD_PALETTE: Record<string, { bg: string; border: string; text: string; badge: string }> = {
-  exploding_kitten: { bg: '#18181b', border: '#ef4444', text: '#ffffff', badge: 'MÈO NỔ' },
-  defuse:           { bg: '#16a34a', border: '#86efac', text: '#ffffff', badge: 'GỠ BOM' },
-  attack:           { bg: '#ea580c', border: '#fed7aa', text: '#ffffff', badge: 'TẤN CÔNG 2X' },
-  skip:             { bg: '#0284c7', border: '#bae6fd', text: '#ffffff', badge: 'BỎ LƯỢT' },
-  favor:            { bg: '#27272a', border: '#71717a', text: '#ffffff', badge: 'XIN XỎ' },
-  shuffle:          { bg: '#65a30d', border: '#d9f99d', text: '#ffffff', badge: 'XÀO BÀI' },
-  see_the_future:   { bg: '#c026d3', border: '#f5d0fe', text: '#ffffff', badge: 'TƯƠNG LAI 3X' },
-  nope:             { bg: '#dc2626', border: '#fecaca', text: '#ffffff', badge: 'NOPE!' },
-  cat_tacocat:      { bg: '#d97706', border: '#fde68a', text: '#ffffff', badge: 'TACO CAT' },
-  cat_potato:       { bg: '#d97706', border: '#fde68a', text: '#ffffff', badge: 'KHOAI TÂY' },
-  cat_cattermelon:  { bg: '#d97706', border: '#fde68a', text: '#ffffff', badge: 'DƯA HẤU' },
-  cat_beard:        { bg: '#d97706', border: '#fde68a', text: '#ffffff', badge: 'RÂU XỒM' },
-  cat_rainbow:      { bg: '#d97706', border: '#fde68a', text: '#ffffff', badge: 'CẦU VỒNG' },
-  imploding_kitten: { bg: '#2e1065', border: '#c084fc', text: '#ffffff', badge: 'MÈO TỰ NỔ' },
-  targeted_attack:  { bg: '#7c2d12', border: '#fdba74', text: '#ffffff', badge: 'TẤN CÔNG 🎯' },
-  alter_the_future: { bg: '#581c87', border: '#e9d5ff', text: '#ffffff', badge: 'ĐỔI TƯƠNG LAI' },
-  draw_from_bottom: { bg: '#134e4a', border: '#5eead4', text: '#ffffff', badge: 'RÚT ĐÁY' },
-  reverse:          { bg: '#1e3a8a', border: '#93c5fd', text: '#ffffff', badge: 'ĐẢO CHIỀU' },
-  feral_cat:        { bg: '#78350f', border: '#fcd34d', text: '#ffffff', badge: 'MÈO HOANG' }
+  exploding_kitten:   { bg: '#18181b', border: '#ef4444', text: '#ffffff', badge: 'MÈO NỔ' },
+  defuse:             { bg: '#16a34a', border: '#86efac', text: '#ffffff', badge: 'GỠ BOM' },
+  attack:             { bg: '#ea580c', border: '#fed7aa', text: '#ffffff', badge: 'TẤN CÔNG 2X' },
+  skip:               { bg: '#0284c7', border: '#bae6fd', text: '#ffffff', badge: 'BỎ LƯỢT' },
+  favor:              { bg: '#27272a', border: '#71717a', text: '#ffffff', badge: 'XIN XỎ' },
+  shuffle:            { bg: '#65a30d', border: '#d9f99d', text: '#ffffff', badge: 'XÀO BÀI' },
+  see_the_future:     { bg: '#c026d3', border: '#f5d0fe', text: '#ffffff', badge: 'TƯƠNG LAI 3X' },
+  nope:               { bg: '#dc2626', border: '#fecaca', text: '#ffffff', badge: 'NOPE!' },
+  cat_tacocat:        { bg: '#d97706', border: '#fde68a', text: '#ffffff', badge: 'TACO CAT' },
+  cat_potato:         { bg: '#d97706', border: '#fde68a', text: '#ffffff', badge: 'KHOAI TÂY' },
+  cat_cattermelon:    { bg: '#d97706', border: '#fde68a', text: '#ffffff', badge: 'DƯA HẤU' },
+  cat_beard:          { bg: '#d97706', border: '#fde68a', text: '#ffffff', badge: 'RÂU XỒM' },
+  cat_rainbow:        { bg: '#d97706', border: '#fde68a', text: '#ffffff', badge: 'CẦU VỒNG' },
+  imploding_kitten:   { bg: '#2e1065', border: '#c084fc', text: '#ffffff', badge: 'MÈO TỰ NỔ' },
+  targeted_attack:    { bg: '#7c2d12', border: '#fdba74', text: '#ffffff', badge: 'TẤN CÔNG 🎯' },
+  alter_the_future:   { bg: '#581c87', border: '#e9d5ff', text: '#ffffff', badge: 'ĐỔI TƯƠNG LAI' },
+  draw_from_bottom:   { bg: '#134e4a', border: '#5eead4', text: '#ffffff', badge: 'RÚT ĐÁY' },
+  reverse:            { bg: '#1e3a8a', border: '#93c5fd', text: '#ffffff', badge: 'ĐẢO CHIỀU' },
+  feral_cat:          { bg: '#78350f', border: '#fcd34d', text: '#ffffff', badge: 'MÈO HOANG' },
+  streaking_kitten:   { bg: '#c2410c', border: '#fed7aa', text: '#ffffff', badge: 'KHỎA THÂN ⚡' },
+  super_skip:         { bg: '#0369a1', border: '#bae6fd', text: '#ffffff', badge: 'SIÊU BỎ LƯỢT ⏩' },
+  see_the_future_5x:  { bg: '#7e22ce', border: '#f3e8ff', text: '#ffffff', badge: 'TƯƠNG LAI 5X 🔮' },
+  alter_the_future_5x:{ bg: '#6b21a8', border: '#e9d5ff', text: '#ffffff', badge: 'ĐỔI 5X 🌀' },
+  swap_top_bottom:    { bg: '#047857', border: '#a7f3d0', text: '#ffffff', badge: 'TRÁO ĐỈNH ĐÁY ↕️' },
+  garbage_collection: { bg: '#475569', border: '#cbd5e1', text: '#ffffff', badge: 'THU GOM RÁC 🚛' },
+  catomic_bomb:       { bg: '#b91c1c', border: '#fecaca', text: '#ffffff', badge: 'HẠT NHÂN ☢️' },
+  mark:               { bg: '#b45309', border: '#fde68a', text: '#ffffff', badge: 'ĐÁNH DẤU 👁️' },
+  curse_of_cat_butt:  { bg: '#be185d', border: '#fbcfe8', text: '#ffffff', badge: 'MÔNG MÈO 🍑' }
 };
 
 export const CardView: React.FC<CardViewProps> = ({
@@ -47,11 +57,49 @@ export const CardView: React.FC<CardViewProps> = ({
   isCompact = false,
   disabled = false,
   highlight = false,
+  isBlind = false,
   className = '',
   style = {},
   lang
 }) => {
   const currentLang: Language = lang || (typeof window !== 'undefined' ? (localStorage.getItem('ek_lang') as Language || 'vi') : 'vi');
+
+  // Nếu người chơi đang bị Mù (Curse of Cat Butt), lá bài trên tay bị úp thành hình Mông Mèo 🍑
+  if (isBlind) {
+    return (
+      <div
+        onClick={!disabled ? onClick : undefined}
+        style={style}
+        className={`relative w-[116px] h-[180px] sm:w-[136px] sm:h-[212px] md:w-[148px] md:h-[228px] rounded-2xl border-3 border-pink-500 bg-gradient-to-br from-pink-950 via-rose-950 to-slate-950 p-2 flex flex-col justify-between items-center select-none transition-all duration-200 card-shadow text-white overflow-hidden ${
+          isSelected ? 'ring-4 ring-yellow-400 -translate-y-4 scale-105 z-40 shadow-2xl' : ''
+        } ${!disabled && onClick ? 'cursor-pointer hover:scale-105 hover:brightness-110 active:scale-95' : 'cursor-default'} ${
+          disabled ? 'opacity-50 grayscale cursor-not-allowed' : ''
+        } ${className}`}
+      >
+        <div className="text-[8px] sm:text-[9px] font-black uppercase text-pink-300 tracking-wider bg-black/45 px-2 py-0.5 rounded-full border border-pink-500/40">
+          {currentLang === 'en' ? '🍑 CAT BUTT' : '🍑 MÔNG MÈO'}
+        </div>
+        <div className="flex flex-col items-center my-auto">
+          <span className="text-4xl sm:text-5xl filter drop-shadow">🍑</span>
+          <p className="text-[10px] sm:text-xs font-black text-pink-200 text-center mt-2 px-1">
+            {currentLang === 'en' ? 'BLIND CARD' : 'BÀI BỊ MÙ'}
+          </p>
+          <p className="text-[7.5px] sm:text-[8px] text-pink-300/70 text-center mt-0.5">
+            {currentLang === 'en' ? 'Play blindly' : 'Đánh mò cầu may'}
+          </p>
+        </div>
+        <div className="text-[7.5px] text-pink-400/60 font-mono font-bold tracking-wider">
+          EK STREAKING
+        </div>
+        {isSelected && (
+          <div className="absolute -top-2 -right-2 w-6 h-6 bg-yellow-400 text-slate-950 rounded-full flex items-center justify-center font-black text-xs shadow-lg border-2 border-slate-900 z-50">
+            ✓
+          </div>
+        )}
+      </div>
+    );
+  }
+
   const definitionId = defId || card?.defId || 'defuse';
   const def = CardRegistry.getCard(definitionId);
   const theme = CARD_PALETTE[definitionId] || { bg: '#334155', border: '#94a3b8', text: '#ffffff', badge: 'LÁ BÀI' };
@@ -153,6 +201,14 @@ export const CardView: React.FC<CardViewProps> = ({
         <span>EK {currentLang === 'en' ? 'EDITION' : 'ORIGINAL'}</span>
         <span className="font-mono font-black">{def.icon}</span>
       </div>
+
+      {/* Huy hiệu Bị Đánh Dấu (Marked Card) công khai cho cả bàn */}
+      {card?.isMarked && (
+        <div className="absolute top-1.5 right-1.5 bg-amber-500 text-slate-950 text-[7px] sm:text-[8px] font-black px-1.5 py-0.5 rounded shadow-lg border border-yellow-200 flex items-center gap-0.5 animate-pulse z-20">
+          <span>👁️</span>
+          <span>{currentLang === 'en' ? 'REVEALED' : 'BỊ LỘ'}</span>
+        </div>
+      )}
 
       {/* Dấu tích khi đang chọn bài */}
       {isSelected && (

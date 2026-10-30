@@ -105,9 +105,10 @@ export class ProbabilityBot {
 
     // 3. Nếu Bot bị ép đưa bài cho Favor
     if (state.pendingAction && state.pendingAction.type === 'FAVOR_GIVE_CARD' && state.pendingAction.targetPlayerId === botId) {
-      // Đưa lá bài ít giá trị nhất (ưu tiên lá mèo lẻ, hoặc bài thường, KHÔNG đưa Defuse nếu có lá khác)
-      const nonDefuseCards = bot.hand.filter(c => c.defId !== 'defuse');
-      const cardToGive = nonDefuseCards.length > 0 ? nonDefuseCards[0] : bot.hand[0];
+      // Đưa lá bài ít giá trị nhất (tránh đưa Defuse, và TRÁNH đưa Streaking Kitten nếu đang ôm bom)
+      const hasBombInHand = bot.hand.some(c => c.defId === 'exploding_kitten');
+      const safeCards = bot.hand.filter(c => c.defId !== 'defuse' && (!hasBombInHand || c.defId !== 'streaking_kitten'));
+      const cardToGive = safeCards.length > 0 ? safeCards[0] : bot.hand[0];
       return { action: 'GIVE_FAVOR', cardUids: [cardToGive.uid] };
     }
 
@@ -131,6 +132,15 @@ export class ProbabilityBot {
     }
 
     // 5. Trong lượt chính của Bot:
+    if (bot.isBlind) {
+      // Khi bị mù bài, Bot có 40% cơ hội đánh mò 1 lá bài, hoặc chọn bốc bài an toàn để giải nguyền
+      if (Math.random() < 0.4 && bot.hand.length > 0) {
+        const randCard = bot.hand[Math.floor(Math.random() * bot.hand.length)];
+        return { action: 'PLAY_CARD', cardUids: [randCard.uid] };
+      }
+      return { action: 'DRAW' };
+    }
+
     const isTopMortalDanger = state.drawPile.length > 0 && 
       state.drawPile[0]?.defId === 'imploding_kitten' && 
       state.drawPile[0]?.isFaceUp === true;
@@ -143,6 +153,12 @@ export class ProbabilityBot {
 
     // NẾU TRÊN ĐỈNH LÀ MÈO TỰ NỔ NGỬA MẶT: BẰNG MỌI GIÁ PHẢI NÉ!
     if (isTopMortalDanger) {
+      const superSkip = bot.hand.find(c => c.defId === 'super_skip');
+      if (superSkip) return { action: 'PLAY_CARD', cardUids: [superSkip.uid] };
+
+      const swapTopBottom = bot.hand.find(c => c.defId === 'swap_top_bottom');
+      if (swapTopBottom) return { action: 'PLAY_CARD', cardUids: [swapTopBottom.uid] };
+
       const bottomDrawCard = bot.hand.find(c => c.defId === 'draw_from_bottom');
       if (bottomDrawCard) return { action: 'PLAY_CARD', cardUids: [bottomDrawCard.uid] };
 
@@ -160,7 +176,7 @@ export class ProbabilityBot {
       const attackCard = bot.hand.find(c => c.defId === 'attack');
       if (attackCard) return { action: 'PLAY_CARD', cardUids: [attackCard.uid] };
 
-      const alterCard = bot.hand.find(c => c.defId === 'alter_the_future');
+      const alterCard = bot.hand.find(c => c.defId === 'alter_the_future' || c.defId === 'alter_the_future_5x');
       if (alterCard) return { action: 'PLAY_CARD', cardUids: [alterCard.uid] };
 
       const shuffleCard = bot.hand.find(c => c.defId === 'shuffle');
@@ -212,12 +228,20 @@ export class ProbabilityBot {
       }
     }
 
-    // c. Nếu có lá Alter the Future hoặc See the Future
+    // c. Nếu có lá Alter the Future hoặc See the Future (3X hoặc 5X)
+    const alter5x = bot.hand.find(c => c.defId === 'alter_the_future_5x');
+    if (alter5x && prob > 0.1) {
+      return { action: 'PLAY_CARD', cardUids: [alter5x.uid] };
+    }
     const alterCard = bot.hand.find(c => c.defId === 'alter_the_future');
     if (alterCard && prob > 0.1) {
       return { action: 'PLAY_CARD', cardUids: [alterCard.uid] };
     }
 
+    const seeFuture5x = bot.hand.find(c => c.defId === 'see_the_future_5x');
+    if (seeFuture5x && prob > 0.15) {
+      return { action: 'PLAY_CARD', cardUids: [seeFuture5x.uid] };
+    }
     const seeFutureCard = bot.hand.find(c => c.defId === 'see_the_future');
     if (seeFutureCard && prob > 0.15) {
       return { action: 'PLAY_CARD', cardUids: [seeFutureCard.uid] };
@@ -225,13 +249,22 @@ export class ProbabilityBot {
 
     // d. Nếu xác suất nguy hiểm cao (prob > 0.2) hoặc lượt dồn:
     if (prob > 0.2 || bot.turnsToTake > 1) {
+      // Ưu tiên Super Skip nếu bị dồn nhiều lượt
+      if (bot.turnsToTake > 1) {
+        const superSkip = bot.hand.find(c => c.defId === 'super_skip');
+        if (superSkip) return { action: 'PLAY_CARD', cardUids: [superSkip.uid] };
+      }
+
       // Ưu tiên Targeted Attack
       const targetedAttack = bot.hand.find(c => c.defId === 'targeted_attack');
       if (targetedAttack && primeTarget) {
         return { action: 'PLAY_CARD', cardUids: [targetedAttack.uid], targetPlayerId: primeTarget.id };
       }
 
-      // Ưu tiên Skip
+      // Ưu tiên Skip / Super Skip
+      const superSkip = bot.hand.find(c => c.defId === 'super_skip');
+      if (superSkip) return { action: 'PLAY_CARD', cardUids: [superSkip.uid] };
+
       const skipCard = bot.hand.find(c => c.defId === 'skip');
       if (skipCard) {
         return { action: 'PLAY_CARD', cardUids: [skipCard.uid] };
@@ -241,6 +274,12 @@ export class ProbabilityBot {
       const reverseCard = bot.hand.find(c => c.defId === 'reverse');
       if (reverseCard) {
         return { action: 'PLAY_CARD', cardUids: [reverseCard.uid] };
+      }
+
+      // Ưu tiên Swap Top & Bottom nếu nguy hiểm
+      const swapCard = bot.hand.find(c => c.defId === 'swap_top_bottom');
+      if (swapCard && prob > 0.3) {
+        return { action: 'PLAY_CARD', cardUids: [swapCard.uid] };
       }
 
       // Ưu tiên Draw from Bottom
@@ -260,6 +299,26 @@ export class ProbabilityBot {
       if (shuffleCard && prob > 0.3) {
         return { action: 'PLAY_CARD', cardUids: [shuffleCard.uid] };
       }
+    }
+
+    // e. Nếu có Curse of Cat Butt -> nguyền đối thủ mạnh nhất
+    const curseCard = bot.hand.find(c => c.defId === 'curse_of_cat_butt');
+    if (curseCard && primeTarget && !primeTarget.isBlind && Math.random() < 0.6) {
+      return {
+        action: 'PLAY_CARD',
+        cardUids: [curseCard.uid],
+        targetPlayerId: primeTarget.id
+      };
+    }
+
+    // f. Nếu có Mark -> đánh dấu đối thủ có nhiều bài
+    const markCard = bot.hand.find(c => c.defId === 'mark');
+    if (markCard && primeTarget && primeTarget.hand.length > 0 && Math.random() < 0.6) {
+      return {
+        action: 'PLAY_CARD',
+        cardUids: [markCard.uid],
+        targetPlayerId: primeTarget.id
+      };
     }
 
     // e. Nếu có Favor và đối thủ có bài

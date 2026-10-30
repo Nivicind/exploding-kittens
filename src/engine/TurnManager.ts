@@ -99,6 +99,18 @@ export class TurnManager {
   }
 
   /**
+   * Xử lý lá bài Super Skip (kết thúc TOÀN BỘ lượt dồn của người chơi ngay lập tức)
+   */
+  static applySuperSkip(state: GameState): number {
+    const current = state.players[state.currentPlayerIndex];
+    if (current && current.isAlive) {
+      current.turnsToTake = 1;
+    }
+    this.advanceTurn(state);
+    return state.currentPlayerIndex;
+  }
+
+  /**
    * Đảo chiều chơi (Reverse - cho bản mở rộng Imploding Kittens)
    * Trả về true nếu người chơi kết thúc hoàn toàn lượt (chuyển sang người khác theo chiều mới),
    * hoặc false nếu vẫn còn lượt do bị dồn Attack trước đó (tiếp tục theo chiều mới).

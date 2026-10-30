@@ -264,6 +264,24 @@ export const App: React.FC = () => {
     socket.emit('draw_bottom', { roomId, playerId: myPlayerId });
   };
 
+  // Chọn mục tiêu Đánh Dấu (Mark)
+  const handleSelectMarkTarget = (targetPlayerId: string) => {
+    if (!socket || !roomId || !myPlayerId) return;
+    socket.emit('select_mark_target', { roomId, playerId: myPlayerId, targetPlayerId });
+  };
+
+  // Chọn mục tiêu Lời Nguyền Mông Mèo (Curse of the Cat Butt)
+  const handleSelectCurseCatButtTarget = (targetPlayerId: string) => {
+    if (!socket || !roomId || !myPlayerId) return;
+    socket.emit('select_curse_cat_butt_target', { roomId, playerId: myPlayerId, targetPlayerId });
+  };
+
+  // Nộp bài vào Xe Thu Gom Rác (Garbage Collection)
+  const handleSubmitGarbageCard = (cardUid: string) => {
+    if (!socket || !roomId || !myPlayerId) return;
+    socket.emit('submit_garbage_card', { roomId, playerId: myPlayerId, cardUid });
+  };
+
   // Rời bàn đấu
   const handleLeaveGame = () => {
     if (socket && roomId && myPlayerId) {
@@ -310,6 +328,9 @@ export const App: React.FC = () => {
           onCloseAlterFuture={handleCloseAlterFuture}
           onSelectTargetedAttack={handleSelectTargetedAttack}
           onDrawBottom={handleDrawBottom}
+          onSelectMarkTarget={handleSelectMarkTarget}
+          onSelectCurseCatButtTarget={handleSelectCurseCatButtTarget}
+          onSubmitGarbageCard={handleSubmitGarbageCard}
           lang={lang}
           onToggleLang={handleToggleLang}
         />

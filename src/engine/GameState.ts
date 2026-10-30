@@ -68,13 +68,16 @@ export class GameStateManager {
     // 2. Xác định cấu hình bài
     const finalExpansions = config?.activeExpansions ?? activeExpansions;
     const hasImploding = finalExpansions.includes('imploding');
+    const hasStreaking = finalExpansions.includes('streaking');
 
     // Quy tắc: 2-5 người: 7 lá thường/người; 6-10 người: 4 lá thường/người
     const handSize = config?.handSize ?? (numPlayers <= 5 ? 7 : 4);
     const defuseInDeck = config?.defuseInDeck ?? 2;
 
-    // Tổng số bom gây chết BẮT BUỘC phải cố định = numPlayers - 1 để ván đấu luôn còn đúng 1 người chiến thắng
-    const totalBombs = Math.max(1, numPlayers - 1);
+    // Tổng số bom gây chết:
+    // Khi có Streaking Kittens: tổng số bom = numPlayers (vì 1 người có thể giấu 1 bom an toàn trên tay)
+    // Khi không có: tổng số bom = Math.max(1, numPlayers - 1)
+    const totalBombs = hasStreaking ? numPlayers : Math.max(1, numPlayers - 1);
     let implodingKittensCount = 0;
     if (hasImploding) {
       if (config?.implodingKittensCount !== undefined) {
@@ -259,6 +262,21 @@ export class GameStateManager {
 
     // 2. Kiểm tra Mèo Nổ (Exploding Kitten)
     if (card.defId === 'exploding_kitten') {
+      const streakingCount = player.hand.filter(c => c.defId === 'streaking_kitten').length;
+      const explodingCount = player.hand.filter(c => c.defId === 'exploding_kitten').length;
+
+      // Streaking Kitten: Bí mật giữ Mèo Nổ trong tay không bị nổ (1 lá Streaking giữ được 1 lá Mèo Nổ)
+      if (streakingCount > explodingCount) {
+        player.hand.push(card);
+        this.addLog(state, `${player.name} rút 1 lá bài an toàn.`, 'info', player.id);
+        if (player.isBlind) {
+          player.isBlind = false;
+          this.addLog(state, `👁️ ${player.name} đã bốc bài an toàn và giải trừ Lời Nguyền Mông Mèo!`, 'info', player.id);
+        }
+        TurnManager.advanceTurn(state);
+        return { cardDrawn: card, exploded: false };
+      }
+
       const defuseIndex = player.hand.findIndex(c => c.defId === 'defuse');
 
       if (defuseIndex !== -1) {
@@ -270,7 +288,8 @@ export class GameStateManager {
           timeoutMs: 30000,
           expiresAt: Date.now() + 30000,
           nopeCount: 0,
-          passedPlayerIds: []
+          passedPlayerIds: [],
+          advanceTurnOnComplete: true
         };
         this.addLog(
           state, 
@@ -305,6 +324,10 @@ export class GameStateManager {
 
     // 3. Rút bài an toàn
     player.hand.push(card);
+    if (player.isBlind) {
+      player.isBlind = false;
+      this.addLog(state, `👁️ ${player.name} đã bốc bài an toàn và giải trừ Lời Nguyền Mông Mèo!`, 'info', player.id);
+    }
     this.addLog(state, `${player.name} rút 1 lá bài an toàn.`, 'info', player.id);
 
     // Kết thúc 1 lượt
@@ -384,11 +407,19 @@ export class GameStateManager {
     const safeIndex = Math.max(0, Math.min(insertIndex, state.drawPile.length));
     state.drawPile.splice(safeIndex, 0, kittenCard);
 
+    const shouldAdvance = state.pendingAction.advanceTurnOnComplete !== false;
     state.pendingAction = null;
     this.addLog(state, `${player.name} đã dùng Defuse thành công và bí mật giấu Mèo Nổ trở lại xấp bài!`, 'defuse', player.id);
 
-    // Hoàn tất lượt rút bài an toàn
-    TurnManager.advanceTurn(state);
+    if (player.isBlind) {
+      player.isBlind = false;
+      this.addLog(state, `👁️ ${player.name} đã giải trừ Lời Nguyền Mông Mèo sau khi xử lý bom an toàn!`, 'info', player.id);
+    }
+
+    // Hoàn tất lượt nếu là do rút bài
+    if (shouldAdvance) {
+      TurnManager.advanceTurn(state);
+    }
   }
 
   /**
@@ -476,6 +507,10 @@ export class GameStateManager {
       throw new Error('Đang có hành động khác chờ hoàn tất.');
     }
 
+    if (player.isBlind && cardUids.length !== 1) {
+      throw new Error('Khi đang bị mù bài, bạn chỉ có thể chọn đánh mò 1 lá bài!');
+    }
+
     // Lấy danh sách thẻ bài cần đánh từ tay
     const cardsToPlay: CardInstance[] = [];
     for (const uid of cardUids) {
@@ -484,6 +519,40 @@ export class GameStateManager {
         throw new Error('Không tìm thấy lá bài trên tay.');
       }
       cardsToPlay.push(player.hand[idx]);
+    }
+
+    // Kiểm tra lá bài Mèo Nổ tự đánh từ tay
+    if (cardsToPlay.length === 1 && cardsToPlay[0].defId === 'exploding_kitten') {
+      if (!player.isBlind) {
+        throw new Error('Không thể tự đánh Mèo Nổ từ tay.');
+      }
+      // Người chơi đang bị mù và đánh mò trúng lá Mèo Nổ đang ôm!
+      const [explodedBomb] = player.hand.splice(player.hand.findIndex(c => c.uid === cardsToPlay[0].uid), 1);
+      const defuseIdx = player.hand.findIndex(c => c.defId === 'defuse');
+      if (defuseIdx !== -1) {
+        state.pendingAction = {
+          type: 'DEFUSE_INSERTION',
+          initiatorId: player.id,
+          cardsPlayed: [explodedBomb],
+          timeoutMs: 30000,
+          expiresAt: Date.now() + 30000,
+          nopeCount: 0,
+          passedPlayerIds: [],
+          advanceTurnOnComplete: false
+        };
+        this.addLog(state, `💥🙈 ${player.name} đang bị mù và đánh mò trúng lá MÈO NỔ! May mắn có lá Defuse để gỡ bom!`, 'defuse', player.id);
+        return;
+      } else {
+        player.isAlive = false;
+        state.discardPile.push(...player.hand, explodedBomb);
+        player.hand = [];
+        this.addLog(state, `💥💀 BÙM! ${player.name} đang bị mù và đánh mò trúng lá MÈO NỔ mà không có Defuse! ${player.name} ĐÃ BỊ LOẠI KHỎI TRẬN!`, 'explode', player.id);
+        const winner = TurnManager.checkWinner(state);
+        if (!winner) {
+          TurnManager.advanceTurn(state);
+        }
+        return;
+      }
     }
 
     // Xóa bài khỏi tay người chơi và cho vào discard pile
@@ -524,10 +593,45 @@ export class GameStateManager {
       return;
     }
     if (def.type === 'DEFUSE') {
+      if (player.isBlind) {
+        this.addLog(state, `🙈 ${player.name} đang bị mù và đánh mò trúng lá Defuse (lá bài bị bỏ đi không có tác dụng gì).`, 'play', player.id);
+        return;
+      }
       throw new Error('Lá Defuse chỉ có tác dụng khi rút trúng Mèo Nổ.');
     }
     if (def.type === 'KITTEN') {
       throw new Error('Không thể tự đánh Mèo Nổ từ tay.');
+    }
+    if (def.type === 'STREAKING') {
+      this.addLog(state, `${player.name} đánh lá Mèo Khỏa Thân (Streaking Kitten) - lá bài bị bỏ đi không có tác dụng!`, 'play', player.id);
+      const bombIdx = player.hand.findIndex(c => c.defId === 'exploding_kitten');
+      if (bombIdx !== -1) {
+        const [bomb] = player.hand.splice(bombIdx, 1);
+        const defuseIdx = player.hand.findIndex(c => c.defId === 'defuse');
+        if (defuseIdx !== -1) {
+          state.pendingAction = {
+            type: 'DEFUSE_INSERTION',
+            initiatorId: player.id,
+            cardsPlayed: [bomb],
+            timeoutMs: 30000,
+            expiresAt: Date.now() + 30000,
+            nopeCount: 0,
+            passedPlayerIds: [],
+            advanceTurnOnComplete: false
+          };
+          this.addLog(state, `⚠️ ${player.name} vừa đánh mất Streaking Kitten khi đang giữ Mèo Nổ! May mắn có lá Defuse để gỡ bom!`, 'defuse', player.id);
+        } else {
+          player.isAlive = false;
+          state.discardPile.push(...player.hand, bomb);
+          player.hand = [];
+          this.addLog(state, `💥 BÙM! ${player.name} đánh mất Streaking Kitten khi đang giữ Mèo Nổ mà không có Defuse! ${player.name} ĐÃ BỊ LOẠI KHỎI TRẬN!`, 'explode', player.id);
+          const winner = TurnManager.checkWinner(state);
+          if (!winner) {
+            TurnManager.advanceTurn(state);
+          }
+        }
+      }
+      return;
     }
 
     // Tạo thông báo
@@ -942,6 +1046,130 @@ export class GameStateManager {
         break;
       }
 
+      case 'super_skip': {
+        TurnManager.applySuperSkip(state);
+        const nextPlayer = state.players[state.currentPlayerIndex];
+        this.addLog(state, `⏩⚡ ${player.name} dùng SIÊU BỎ LƯỢT (Super Skip)! Hủy sạch mọi lượt dồn và chuyển sang ${nextPlayer?.name}.`, 'play', player.id);
+        break;
+      }
+
+      case 'see_the_future_5x': {
+        const peek = state.drawPile.slice(0, 5);
+        state.peekCards = {
+          playerId: player.id,
+          cards: peek
+        };
+        this.addLog(state, `🔮 ${player.name} đang xem trước 5 lá bài trên cùng của xấp bài rút.`, 'info', player.id);
+        break;
+      }
+
+      case 'alter_the_future_5x': {
+        const peek = state.drawPile.slice(0, 5);
+        state.alterCards = {
+          playerId: player.id,
+          cards: peek
+        };
+        state.pendingAction = {
+          type: 'ALTER_THE_FUTURE',
+          initiatorId: player.id,
+          cardsPlayed: [card],
+          alterCards: peek,
+          timeoutMs: 60000,
+          expiresAt: Date.now() + 60000,
+          nopeCount: 0,
+          passedPlayerIds: []
+        };
+        this.addLog(state, `🌀 ${player.name} đang xem và sắp xếp lại 5 lá bài trên cùng của xấp rút.`, 'info', player.id);
+        break;
+      }
+
+      case 'swap_top_bottom': {
+        if (state.drawPile.length >= 2) {
+          const top = state.drawPile[0];
+          const bottom = state.drawPile[state.drawPile.length - 1];
+          state.drawPile[0] = bottom;
+          state.drawPile[state.drawPile.length - 1] = top;
+          this.addLog(state, `↕️ ${player.name} dùng Tráo Đỉnh Đáy (Swap Top & Bottom)! Đã đổi chỗ lá bài trên đỉnh và dưới đáy xấp bài.`, 'play', player.id);
+        } else {
+          this.addLog(state, `↕️ ${player.name} dùng Tráo Đỉnh Đáy nhưng xấp bài không đủ lá để tráo!`, 'info', player.id);
+        }
+        break;
+      }
+
+      case 'catomic_bomb': {
+        const bombs: CardInstance[] = [];
+        const nonBombs: CardInstance[] = [];
+        for (const c of state.drawPile) {
+          if (c.defId === 'exploding_kitten' || c.defId === 'imploding_kitten') {
+            bombs.push(c);
+          } else {
+            nonBombs.push(c);
+          }
+        }
+        this.shuffleArray(nonBombs);
+        this.shuffleArray(bombs);
+        state.drawPile = [...bombs, ...nonBombs];
+
+        this.addLog(state, `☢️💥 ${player.name} kích hoạt BOM HẠT NHÂN MÈO! Toàn bộ ${bombs.length} quả bom đã được gom lên ĐỈNH xấp bài!`, 'play', player.id);
+
+        const turnedEnded = TurnManager.applySkip(state);
+        if (turnedEnded) {
+          const nextPlayer = state.players[state.currentPlayerIndex];
+          this.addLog(state, `⏩ ${player.name} kết thúc lượt sau khi thả Bom Hạt Nhân. Đến lượt ${nextPlayer?.name}.`, 'info', player.id);
+        }
+        break;
+      }
+
+      case 'mark': {
+        if (!options?.targetPlayerId) {
+          state.pendingAction = {
+            type: 'MARK_CHOOSE_PLAYER',
+            initiatorId: player.id,
+            cardsPlayed: [card],
+            timeoutMs: 30000,
+            expiresAt: Date.now() + 30000,
+            nopeCount: 0,
+            passedPlayerIds: []
+          };
+        } else {
+          this.executeMark(state, player, options.targetPlayerId);
+        }
+        break;
+      }
+
+      case 'curse_of_cat_butt': {
+        if (!options?.targetPlayerId) {
+          state.pendingAction = {
+            type: 'CURSE_CAT_BUTT_CHOOSE_PLAYER',
+            initiatorId: player.id,
+            cardsPlayed: [card],
+            timeoutMs: 30000,
+            expiresAt: Date.now() + 30000,
+            nopeCount: 0,
+            passedPlayerIds: []
+          };
+        } else {
+          this.executeCurseCatButt(state, player, options.targetPlayerId);
+        }
+        break;
+      }
+
+      case 'garbage_collection': {
+        state.pendingAction = {
+          type: 'GARBAGE_COLLECTION',
+          initiatorId: player.id,
+          cardsPlayed: [card],
+          timeoutMs: 45000,
+          expiresAt: Date.now() + 45000,
+          nopeCount: 0,
+          passedPlayerIds: [],
+          garbagePicks: {}
+        };
+        this.addLog(state, `🚛 ${player.name} gọi XE THU GOM RÁC! Mọi người chơi còn sống phải chọn 1 lá bài trên tay để trả lại xấp bài rút!`, 'play', player.id);
+        this.checkBotGarbagePicks(state);
+        break;
+      }
+
       default:
         break;
     }
@@ -988,10 +1216,9 @@ export class GameStateManager {
     if (cardIdx === -1) throw new Error('Không tìm thấy lá bài trên tay.');
 
     const [givenCard] = target.hand.splice(cardIdx, 1);
-    initiator.hand.push(givenCard);
-
     state.pendingAction = null;
     this.addLog(state, `🤝 ${target.name} đã đưa 1 lá bài cho ${initiator.name}.`, 'info', target.id);
+    this.handleCardTransfer(state, target, initiator, givenCard, 'favor');
   }
 
   /**
@@ -1014,7 +1241,7 @@ export class GameStateManager {
   }
 
   /**
-   * Sắp xếp lại các lá bài trong Alter the Future
+   * Sắp xếp lại các lá bài trong Alter the Future (hỗ trợ cả 3 lá và 5 lá)
    */
   static reorderAlterFuture(state: GameState, playerId: string, newCards: CardInstance[]): void {
     if (!state.pendingAction || state.pendingAction.type !== 'ALTER_THE_FUTURE' || state.pendingAction.initiatorId !== playerId) {
@@ -1023,13 +1250,14 @@ export class GameStateManager {
     const player = state.players.find(p => p.id === playerId);
     if (!player) throw new Error('Người chơi không tồn tại.');
 
-    const count = Math.min(newCards.length, state.drawPile.length, 3);
+    const maxCards = state.pendingAction.cardsPlayed[0]?.defId === 'alter_the_future_5x' ? 5 : 3;
+    const count = Math.min(newCards.length, state.drawPile.length, maxCards);
     for (let i = 0; i < count; i++) {
       state.drawPile[i] = newCards[i];
     }
     state.pendingAction = null;
     state.alterCards = null;
-    this.addLog(state, `🔮 ${player.name} đã sắp xếp lại các lá bài trên cùng của xấp bài rút!`, 'info', player.id);
+    this.addLog(state, `🔮 ${player.name} đã sắp xếp lại ${count} lá bài trên cùng của xấp bài rút!`, 'info', player.id);
   }
 
   /**
@@ -1045,6 +1273,121 @@ export class GameStateManager {
   }
 
   /**
+   * Chuyển một lá bài từ người này sang người khác (do Cướp Combo hoặc Favor),
+   * xử lý đầy đủ các hiệu ứng đặc biệt của Streaking Kittens (ôm bom, mất bùa hộ mệnh, kích nổ).
+   */
+  private static handleCardTransfer(
+    state: GameState,
+    fromPlayer: PlayerState,
+    toPlayer: PlayerState,
+    card: CardInstance,
+    source: 'combo' | 'favor'
+  ): void {
+    // 1. Tẩy trạng thái đánh dấu (Marked) nếu có
+    card.isMarked = false;
+
+    // 2. Kiểm tra nếu người bị cướp mất lá STREAKING_KITTEN trong khi đang giữ BOM MÈO NỔ
+    if (card.defId === 'streaking_kitten') {
+      const bombsLeft = fromPlayer.hand.filter(c => c.defId === 'exploding_kitten').length;
+      const streakingsLeft = fromPlayer.hand.filter(c => c.defId === 'streaking_kitten').length;
+
+      if (bombsLeft > streakingsLeft) {
+        // fromPlayer đang giữ bom mà mất bùa hộ mệnh!
+        const defuseIdx = fromPlayer.hand.findIndex(c => c.defId === 'defuse');
+        const bombIdx = fromPlayer.hand.findIndex(c => c.defId === 'exploding_kitten');
+        const [explodedBomb] = fromPlayer.hand.splice(bombIdx, 1);
+
+        if (defuseIdx !== -1) {
+          state.pendingAction = {
+            type: 'DEFUSE_INSERTION',
+            initiatorId: fromPlayer.id,
+            cardsPlayed: [explodedBomb],
+            timeoutMs: 30000,
+            expiresAt: Date.now() + 30000,
+            nopeCount: 0,
+            passedPlayerIds: [],
+            advanceTurnOnComplete: false
+          };
+          this.addLog(
+            state,
+            `⚠️ ${fromPlayer.name} bị cướp mất lá Streaking Kitten trong khi đang ôm Mèo Nổ! May mắn có Defuse để gỡ bom!`,
+            'defuse',
+            fromPlayer.id
+          );
+        } else {
+          fromPlayer.isAlive = false;
+          state.discardPile.push(...fromPlayer.hand, explodedBomb);
+          fromPlayer.hand = [];
+          this.addLog(
+            state,
+            `💥 BÙM! ${fromPlayer.name} bị cướp mất Streaking Kitten khi đang giữ Mèo Nổ mà không có Defuse! ${fromPlayer.name} ĐÃ BỊ LOẠI KHỎI TRẬN!`,
+            'explode',
+            fromPlayer.id
+          );
+          TurnManager.checkWinner(state);
+        }
+      }
+    }
+
+    // 3. Kiểm tra nếu lá bài được chuyển là MÈO NỔ (Exploding Kitten)
+    if (card.defId === 'exploding_kitten') {
+      const toStreakings = toPlayer.hand.filter(c => c.defId === 'streaking_kitten').length;
+      const toBombs = toPlayer.hand.filter(c => c.defId === 'exploding_kitten').length;
+
+      if (toStreakings > toBombs) {
+        // toPlayer có Streaking Kitten bảo vệ -> nhận bom an toàn vào tay!
+        toPlayer.hand.push(card);
+        this.addLog(
+          state,
+          `⚡ ${toPlayer.name} đã nhận phải MÈO NỔ nhưng có Streaking Kitten bảo hộ nên an toàn!`,
+          'info',
+          toPlayer.id
+        );
+        return;
+      }
+
+      // Không có Streaking Kitten bảo vệ -> toPlayer bị kích nổ ngay lập tức!
+      const defuseIdx = toPlayer.hand.findIndex(c => c.defId === 'defuse');
+      if (defuseIdx !== -1) {
+        state.pendingAction = {
+          type: 'DEFUSE_INSERTION',
+          initiatorId: toPlayer.id,
+          cardsPlayed: [card],
+          timeoutMs: 30000,
+          expiresAt: Date.now() + 30000,
+          nopeCount: 0,
+          passedPlayerIds: [],
+          advanceTurnOnComplete: false
+        };
+        this.addLog(
+          state,
+          `⚠️ BÙM! ${toPlayer.name} đã cướp phải MÈO NỔ từ tay của ${fromPlayer.name}! Rất may có Defuse để gỡ bom!`,
+          'defuse',
+          toPlayer.id
+        );
+      } else {
+        toPlayer.isAlive = false;
+        state.discardPile.push(...toPlayer.hand, card);
+        toPlayer.hand = [];
+        this.addLog(
+          state,
+          `💥 BÙM! ${toPlayer.name} đã cướp phải MÈO NỔ từ tay của ${fromPlayer.name} mà không có Defuse hay Streaking Kitten! ${toPlayer.name} ĐÃ BỊ LOẠI KHỎI TRẬN!`,
+          'explode',
+          toPlayer.id
+        );
+        const winner = TurnManager.checkWinner(state);
+        if (!winner && state.players[state.currentPlayerIndex].id === toPlayer.id) {
+          TurnManager.advanceTurn(state);
+        }
+      }
+      return;
+    }
+
+    // Bài thông thường
+    toPlayer.hand.push(card);
+  }
+
+  /**
    * Thực thi Combo 2 lá
    */
   private static executeComboTwo(state: GameState, player: PlayerState, targetPlayerId: string): void {
@@ -1057,9 +1400,8 @@ export class GameStateManager {
     // Chọn ngẫu nhiên 1 lá từ tay target
     const randomIdx = Math.floor(Math.random() * target.hand.length);
     const [stolenCard] = target.hand.splice(randomIdx, 1);
-    player.hand.push(stolenCard);
-
     this.addLog(state, `🎯 ${player.name} đã cướp ngẫu nhiên 1 lá bài từ tay của ${target.name}!`, 'info', player.id);
+    this.handleCardTransfer(state, target, player, stolenCard, 'combo');
   }
 
   /**
@@ -1080,23 +1422,186 @@ export class GameStateManager {
 
     const cardIdx = target.hand.findIndex(c => c.defId === targetCardDefId);
     if (cardIdx !== -1) {
-      // Có bài -> Bắt buộc phải đưa
       const [stolenCard] = target.hand.splice(cardIdx, 1);
-      player.hand.push(stolenCard);
       this.addLog(
         state, 
         `🎉 ${player.name} đòi lá "${targetCardDef?.name}" thành công! ${target.name} đã bị tước lá này.`, 
         'info', 
         player.id
       );
+      this.handleCardTransfer(state, target, player, stolenCard, 'combo');
     } else {
-      // Không có bài -> Trắng tay!
       this.addLog(
         state, 
         `😅 ${player.name} đòi lá "${targetCardDef?.name}" nhưng ${target.name} KHÔNG CÓ! ${player.name} nhận về số 0 tròn trĩnh.`, 
         'info', 
         player.id
       );
+    }
+  }
+
+  /**
+   * Đánh dấu 1 lá ngẫu nhiên trên tay đối thủ thành công khai
+   */
+  static selectMarkTarget(state: GameState, playerId: string, targetPlayerId: string): void {
+    if (!state.pendingAction || state.pendingAction.type !== 'MARK_CHOOSE_PLAYER' || state.pendingAction.initiatorId !== playerId) {
+      throw new Error('Yêu cầu chọn mục tiêu Mark không hợp lệ.');
+    }
+    const player = state.players.find(p => p.id === playerId);
+    if (!player) throw new Error('Người chơi không tồn tại.');
+    state.pendingAction = null;
+    this.executeMark(state, player, targetPlayerId);
+  }
+
+  private static executeMark(state: GameState, player: PlayerState, targetPlayerId: string): void {
+    const target = state.players.find(p => p.id === targetPlayerId);
+    if (!target || !target.isAlive || target.hand.length === 0) {
+      this.addLog(state, `👁️ ${player.name} chọn Đánh Dấu nhưng ${target?.name || 'đối thủ'} không có bài trên tay!`, 'info', player.id);
+      return;
+    }
+    const unmarkedCards = target.hand.filter(c => !c.isMarked);
+    const pool = unmarkedCards.length > 0 ? unmarkedCards : target.hand;
+    const chosenCard = pool[Math.floor(Math.random() * pool.length)];
+    chosenCard.isMarked = true;
+    const def = CardRegistry.getCard(chosenCard.defId);
+    this.addLog(
+      state,
+      `👁️ ${player.name} đã ĐÁNH DẤU ngẫu nhiên lá "${def?.name}" trên tay của ${target.name}! Lá bài này sẽ được công khai cho cả bàn thấy.`,
+      'play',
+      player.id
+    );
+  }
+
+  /**
+   * Nguyền rủa đối thủ bị mù bài (Curse of the Cat Butt)
+   */
+  static selectCurseCatButtTarget(state: GameState, playerId: string, targetPlayerId: string): void {
+    if (!state.pendingAction || state.pendingAction.type !== 'CURSE_CAT_BUTT_CHOOSE_PLAYER' || state.pendingAction.initiatorId !== playerId) {
+      throw new Error('Yêu cầu chọn mục tiêu Curse of Cat Butt không hợp lệ.');
+    }
+    const player = state.players.find(p => p.id === playerId);
+    if (!player) throw new Error('Người chơi không tồn tại.');
+    state.pendingAction = null;
+    this.executeCurseCatButt(state, player, targetPlayerId);
+  }
+
+  private static executeCurseCatButt(state: GameState, player: PlayerState, targetPlayerId: string): void {
+    const target = state.players.find(p => p.id === targetPlayerId);
+    if (!target || !target.isAlive) {
+      this.addLog(state, `🍑 ${player.name} yểm bùa nhưng đối thủ không tồn tại!`, 'info', player.id);
+      return;
+    }
+    target.isBlind = true;
+    this.shuffleArray(target.hand);
+    this.addLog(
+      state,
+      `🍑 ${player.name} đã yểm LỜI NGUYỀN MÔNG MÈO lên ${target.name}! Toàn bộ bài trên tay họ bị úp mặt thành 🍑 và xáo trộn, phải đánh mò cho đến khi bốc bài an toàn!`,
+      'play',
+      player.id
+    );
+  }
+
+  /**
+   * Tự động chọn bài rác cho Bot trong Garbage Collection
+   */
+  static checkBotGarbagePicks(state: GameState): void {
+    if (!state.pendingAction || state.pendingAction.type !== 'GARBAGE_COLLECTION') return;
+    if (!state.pendingAction.garbagePicks) {
+      state.pendingAction.garbagePicks = {};
+    }
+
+    for (const p of state.players) {
+      if (p.isAlive && p.hand.length > 0 && p.isBot && !state.pendingAction.garbagePicks[p.id]) {
+        // Bot ưu tiên nộp lá vô hại, tránh nộp Defuse hoặc Streaking Kitten nếu đang ôm bom
+        const safeCards = p.hand.filter(c => c.defId !== 'defuse' && c.defId !== 'streaking_kitten');
+        const pick = safeCards.length > 0 ? safeCards[0] : p.hand[0];
+        state.pendingAction.garbagePicks[p.id] = pick.uid;
+      }
+    }
+
+    this.checkGarbageCompletion(state);
+  }
+
+  /**
+   * Người chơi nộp 1 lá bài vào Garbage Collection
+   */
+  static submitGarbageCard(state: GameState, playerId: string, cardUid: string): void {
+    if (!state.pendingAction || state.pendingAction.type !== 'GARBAGE_COLLECTION') {
+      throw new Error('Không có sự kiện Thu Gom Rác nào đang diễn ra.');
+    }
+    const player = state.players.find(p => p.id === playerId);
+    if (!player || !player.isAlive) throw new Error('Người chơi không hợp lệ.');
+    if (player.hand.length === 0) return;
+
+    const hasCard = player.hand.some(c => c.uid === cardUid);
+    if (!hasCard) throw new Error('Không tìm thấy lá bài trên tay.');
+
+    if (!state.pendingAction.garbagePicks) {
+      state.pendingAction.garbagePicks = {};
+    }
+    state.pendingAction.garbagePicks[playerId] = cardUid;
+
+    this.checkBotGarbagePicks(state);
+    this.checkGarbageCompletion(state);
+  }
+
+  /**
+   * Kiểm tra xem tất cả người chơi đủ điều kiện đã nộp bài vào Garbage Collection chưa
+   */
+  private static checkGarbageCompletion(state: GameState): void {
+    if (!state.pendingAction || state.pendingAction.type !== 'GARBAGE_COLLECTION') return;
+    const eligiblePlayers = state.players.filter(p => p.isAlive && p.hand.length > 0);
+    const picks = state.pendingAction.garbagePicks || {};
+
+    const allSubmitted = eligiblePlayers.every(p => !!picks[p.id]);
+    if (allSubmitted) {
+      let count = 0;
+      for (const p of eligiblePlayers) {
+        const uid = picks[p.id];
+        const cardIdx = p.hand.findIndex(c => c.uid === uid);
+        if (cardIdx !== -1) {
+          const [card] = p.hand.splice(cardIdx, 1);
+          card.isMarked = false;
+          state.drawPile.push(card);
+          count++;
+
+          // Nếu người này vừa nộp lá Streaking Kitten trong khi vẫn giữ bom Mèo Nổ -> nổ ngay!
+          if (card.defId === 'streaking_kitten') {
+            const bombs = p.hand.filter(c => c.defId === 'exploding_kitten').length;
+            const streakings = p.hand.filter(c => c.defId === 'streaking_kitten').length;
+            if (bombs > streakings) {
+              const defuseIdx = p.hand.findIndex(c => c.defId === 'defuse');
+              if (defuseIdx !== -1) {
+                const bombIdx = p.hand.findIndex(c => c.defId === 'exploding_kitten');
+                const [b] = p.hand.splice(bombIdx, 1);
+                state.pendingAction = {
+                  type: 'DEFUSE_INSERTION',
+                  initiatorId: p.id,
+                  cardsPlayed: [b],
+                  timeoutMs: 30000,
+                  expiresAt: Date.now() + 30000,
+                  nopeCount: 0,
+                  passedPlayerIds: [],
+                  advanceTurnOnComplete: false
+                };
+                this.addLog(state, `⚠️ ${p.name} vừa nộp lá Streaking Kitten khi đang giữ Mèo Nổ! Phải dùng Defuse để gỡ bom!`, 'defuse', p.id);
+                this.shuffleArray(state.drawPile);
+                return;
+              } else {
+                p.isAlive = false;
+                state.discardPile.push(...p.hand);
+                p.hand = [];
+                this.addLog(state, `💥 BÙM! ${p.name} nộp Streaking Kitten khi đang giữ bom và không có Defuse! ${p.name} ĐÃ BỊ LOẠI!`, 'explode', p.id);
+                TurnManager.checkWinner(state);
+              }
+            }
+          }
+        }
+      }
+
+      this.shuffleArray(state.drawPile);
+      state.pendingAction = null;
+      this.addLog(state, `🚛 Xe thu gom rác hoàn tất! Đã gom ${count} lá bài từ người chơi vào xấp bài rút và xáo đều.`, 'info');
     }
   }
 

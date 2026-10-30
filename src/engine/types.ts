@@ -7,7 +7,9 @@ export type CardType =
   | 'SHUFFLE' 
   | 'SEE_THE_FUTURE' 
   | 'NOPE' 
-  | 'CAT';
+  | 'CAT'
+  | 'STREAKING'
+  | 'ACTION';
 
 export interface CardDefinition {
   id: string;
@@ -60,7 +62,10 @@ export type PendingActionType =
   | 'TARGETED_ATTACK_CHOOSE_PLAYER'
   | 'COMBO_TWO_CHOOSE_PLAYER'
   | 'COMBO_THREE_CHOOSE_TARGET'
-  | 'COMBO_FIVE_CHOOSE_DISCARD';
+  | 'COMBO_FIVE_CHOOSE_DISCARD'
+  | 'MARK_CHOOSE_PLAYER'
+  | 'CURSE_CAT_BUTT_CHOOSE_PLAYER'
+  | 'GARBAGE_COLLECTION';
 
 export interface PendingAction {
   type: PendingActionType;
@@ -72,7 +77,9 @@ export interface PendingAction {
   expiresAt: number;
   nopeCount: number;            // 0: bình thường, 1: bị nope, 2: nope lại (yup)...
   passedPlayerIds: string[];    // Những người đã ấn Pass cửa sổ Nope
-  alterCards?: CardInstance[];  // 3 lá đang được xếp lại cho Alter the Future
+  alterCards?: CardInstance[];  // 3 hoặc 5 lá đang được xếp lại cho Alter the Future
+  garbagePicks?: Record<string, string>; // playerId -> cardUid cho Garbage Collection
+  advanceTurnOnComplete?: boolean; // Chuyển lượt khi hoàn tất Defuse (mặc định true khi rút bài, false khi gỡ do bị cướp)
 }
 
 export interface CustomDeckConfig {
