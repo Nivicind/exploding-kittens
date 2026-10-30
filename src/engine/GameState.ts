@@ -73,20 +73,17 @@ export class GameStateManager {
     const handSize = config?.handSize ?? (numPlayers <= 5 ? 7 : 4);
     const defuseInDeck = config?.defuseInDeck ?? 2;
 
-    let explodingKittensCount = config?.explodingKittensCount;
-    let implodingKittensCount = config?.implodingKittensCount;
-
-    if (explodingKittensCount === undefined) {
-      if (hasImploding) {
-        explodingKittensCount = Math.max(1, numPlayers - 2);
+    // Tổng số bom gây chết BẮT BUỘC phải cố định = numPlayers - 1 để ván đấu luôn còn đúng 1 người chiến thắng
+    const totalBombs = Math.max(1, numPlayers - 1);
+    let implodingKittensCount = 0;
+    if (hasImploding) {
+      if (config?.implodingKittensCount !== undefined) {
+        implodingKittensCount = Math.max(0, Math.min(totalBombs, config.implodingKittensCount));
       } else {
-        explodingKittensCount = numPlayers - 1;
+        implodingKittensCount = Math.min(1, totalBombs);
       }
     }
-
-    if (implodingKittensCount === undefined) {
-      implodingKittensCount = hasImploding ? 1 : 0;
-    }
+    const explodingKittensCount = totalBombs - implodingKittensCount;
 
     // 3. Chuẩn bị bài thường và Defuse
     const allDefs = CardRegistry.getAllCards(finalExpansions);

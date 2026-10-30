@@ -80,3 +80,4 @@ export const IMPLODING_KITTENS_CARDS: CardDefinition[] = [
     defaultCount: 4
   }
 ];
+

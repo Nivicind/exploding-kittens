@@ -326,6 +326,7 @@ export const Lobby: React.FC<LobbyProps> = ({
           config={room.deckConfig}
           onSave={onUpdateDeckConfig}
           playerCount={room.players.length}
+          lang={lang}
         />
       </div>
     );
@@ -578,6 +579,7 @@ export const Lobby: React.FC<LobbyProps> = ({
         config={deckConfig}
         onSave={cfg => setDeckConfig(cfg)}
         playerCount={singlePlayerCount}
+        lang={lang}
       />
     </div>
   );

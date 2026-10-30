@@ -175,4 +175,42 @@ describe('Bản mở rộng Imploding Kittens', () => {
     // 1 Feral Cat + 1 Taco Cat + 1 Beard Cat = Không hợp lệ (2 loại mèo khác nhau)
     expect(GameStateManager.isValidComboThree([cFeral, cTaco, { uid: 'beard_1', defId: 'cat_beard' }])).toBe(false);
   });
+
+  it('Cố định tổng số bom = người chơi - 1, tự động cân bằng khi chỉnh số lượng Imploding Kittens', () => {
+    // 1. Trường hợp 4 người chơi: Tổng số bom luôn cố định = 4 - 1 = 3 lá
+    // Imploding = 0 lá -> Exploding = 3 lá
+    const state0 = GameStateManager.createGame(players, { implodingKittensCount: 0 }, ['base', 'imploding']);
+    const exp0 = state0.drawPile.filter(c => c.defId === 'exploding_kitten').length;
+    const imp0 = state0.drawPile.filter(c => c.defId === 'imploding_kitten').length;
+    expect(imp0).toBe(0);
+    expect(exp0).toBe(3);
+    expect(exp0 + imp0).toBe(3);
+
+    // Imploding = 2 lá -> Exploding = 1 lá
+    const state2 = GameStateManager.createGame(players, { implodingKittensCount: 2 }, ['base', 'imploding']);
+    const exp2 = state2.drawPile.filter(c => c.defId === 'exploding_kitten').length;
+    const imp2 = state2.drawPile.filter(c => c.defId === 'imploding_kitten').length;
+    expect(imp2).toBe(2);
+    expect(exp2).toBe(1);
+    expect(exp2 + imp2).toBe(3);
+
+    // Imploding = 3 lá (tối đa toàn bộ bom) -> Exploding = 0 lá
+    const state3 = GameStateManager.createGame(players, { implodingKittensCount: 3 }, ['base', 'imploding']);
+    const exp3 = state3.drawPile.filter(c => c.defId === 'exploding_kitten').length;
+    const imp3 = state3.drawPile.filter(c => c.defId === 'imploding_kitten').length;
+    expect(imp3).toBe(3);
+    expect(exp3).toBe(0);
+    expect(exp3 + imp3).toBe(3);
+
+    // 2. Chống phá hoại / chống lỗi: Nếu gửi số lượng bom vượt mức (ví dụ: exploding: 99, imploding: 99)
+    // Hệ thống backend vẫn BẢO TOÀN chặt chẽ tổng bom = 3 lá
+    const stateOverflow = GameStateManager.createGame(
+      players, 
+      { explodingKittensCount: 99, implodingKittensCount: 99 }, 
+      ['base', 'imploding']
+    );
+    const expOver = stateOverflow.drawPile.filter(c => c.defId === 'exploding_kitten').length;
+    const impOver = stateOverflow.drawPile.filter(c => c.defId === 'imploding_kitten').length;
+    expect(expOver + impOver).toBe(3);
+  });
 });

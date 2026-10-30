@@ -31,17 +31,21 @@ export const CustomDeckModal: React.FC<CustomDeckModalProps> = ({
     c => c.type !== 'KITTEN' && c.type !== 'DEFUSE'
   );
 
+  const totalBombs = Math.max(1, playerCount - 1);
   const defaultHandSize = playerCount <= 5 ? 7 : 4;
   const [handSize, setHandSize] = useState<number>(config?.handSize ?? defaultHandSize);
   const [defuseInDeck, setDefuseInDeck] = useState<number>(config?.defuseInDeck ?? 2);
 
-  const defaultExploding = hasImploding ? Math.max(1, playerCount - 2) : playerCount - 1;
-  const [explodingKittensCount, setExplodingKittensCount] = useState<number>(
-    config?.explodingKittensCount ?? defaultExploding
-  );
-  const [implodingKittensCount, setImplodingKittensCount] = useState<number>(
-    config?.implodingKittensCount ?? (hasImploding ? 1 : 0)
-  );
+  const defaultImploding = hasImploding ? Math.min(1, totalBombs) : 0;
+  const [implodingKittensCount, setImplodingKittensCount] = useState<number>(() => {
+    if (!hasImploding) return 0;
+    if (config?.implodingKittensCount !== undefined) {
+      return Math.max(0, Math.min(totalBombs, config.implodingKittensCount));
+    }
+    return defaultImploding;
+  });
+
+  const explodingKittensCount = totalBombs - (hasImploding ? implodingKittensCount : 0);
 
   const [cardCounts, setCardCounts] = useState<Record<string, number>>(() => {
     const initial: Record<string, number> = {};
@@ -57,13 +61,11 @@ export const CustomDeckModal: React.FC<CustomDeckModalProps> = ({
     const nextHasImploding = !hasImploding;
     setHasImploding(nextHasImploding);
 
-    // Tự động điều chỉnh số lượng bom phù hợp
+    // Tự động điều chỉnh số lượng bom phù hợp (tổng luôn bằng totalBombs)
     if (nextHasImploding) {
-      setImplodingKittensCount(1);
-      setExplodingKittensCount(Math.max(1, playerCount - 2));
+      setImplodingKittensCount(Math.min(1, totalBombs));
     } else {
       setImplodingKittensCount(0);
-      setExplodingKittensCount(playerCount - 1);
     }
   };
 
@@ -79,7 +81,6 @@ export const CustomDeckModal: React.FC<CustomDeckModalProps> = ({
     setHasImploding(false);
     setHandSize(playerCount <= 5 ? 7 : 4);
     setDefuseInDeck(2);
-    setExplodingKittensCount(playerCount - 1);
     setImplodingKittensCount(0);
     const resetCounts: Record<string, number> = {};
     const baseCards = CardRegistry.getAllCards(['base']).filter(c => c.type !== 'KITTEN' && c.type !== 'DEFUSE');
@@ -90,12 +91,14 @@ export const CustomDeckModal: React.FC<CustomDeckModalProps> = ({
   };
 
   const handleSave = () => {
+    const finalImploding = hasImploding ? Math.max(0, Math.min(totalBombs, implodingKittensCount)) : 0;
+    const finalExploding = totalBombs - finalImploding;
     onSave({
       handSize,
       defuseInDeck,
       cardCounts,
-      explodingKittensCount,
-      implodingKittensCount: hasImploding ? implodingKittensCount : 0,
+      explodingKittensCount: finalExploding,
+      implodingKittensCount: finalImploding,
       activeExpansions: hasImploding ? ['base', 'imploding'] : ['base']
     });
     onClose();
@@ -197,43 +200,92 @@ export const CustomDeckModal: React.FC<CustomDeckModalProps> = ({
             </div>
           </div>
 
-          {/* Cấu hình Số lượng Bom: Mèo Nổ & Mèo Tự Nổ */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 bg-slate-950/80 p-3.5 rounded-xl border border-slate-800">
-            <div>
-              <div className="flex justify-between items-center text-xs font-bold text-slate-200 mb-1">
-                <span className="flex items-center gap-1.5 text-rose-400">
-                  <span>💣</span> {lang === 'en' ? 'Exploding Kittens:' : 'Số Mèo Nổ (Exploding):'}
-                </span>
-                <span className="font-mono text-rose-400 font-black text-sm">{explodingKittensCount} {lang === 'en' ? 'cards' : 'lá'}</span>
+          {/* Cấu hình Số lượng Bom: Cố định Tổng số bom = Số người chơi - 1 */}
+          <div className="bg-slate-950/80 p-3.5 sm:p-4 rounded-xl border border-slate-800 space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
+              <div className="flex items-center gap-2">
+                <span className="text-base sm:text-lg">💣</span>
+                <div>
+                  <h4 className="text-xs sm:text-sm font-black text-rose-400 uppercase tracking-wide">
+                    {lang === 'en' ? 'Lethal Bomb Count (Fixed Rule)' : 'Số Lượng Bom (Cố Định Chuẩn Luật)'}
+                  </h4>
+                  <p className="text-[10px] text-slate-400">
+                    {lang === 'en' 
+                      ? `Total lethal bombs is strictly fixed = ${playerCount} - 1 = ${totalBombs} cards to ensure 1 sole winner.` 
+                      : `Tổng số bom bắt buộc cố định = ${playerCount} - 1 = ${totalBombs} lá để luôn tìm ra duy nhất 1 người thắng.`}
+                  </p>
+                </div>
               </div>
-              <input
-                type="range"
-                min="1"
-                max="9"
-                value={explodingKittensCount}
-                onChange={e => setExplodingKittensCount(parseInt(e.target.value))}
-                className="w-full accent-rose-500 cursor-pointer"
-              />
+              <div className="px-2.5 py-1 rounded-full bg-rose-500/20 border border-rose-500/50 text-rose-300 font-mono font-black text-xs sm:text-sm whitespace-nowrap">
+                🔒 {totalBombs} {lang === 'en' ? 'bombs' : 'bom'}
+              </div>
             </div>
 
-            {hasImploding && (
-              <div>
-                <div className="flex justify-between items-center text-xs font-bold text-slate-200 mb-1">
-                  <span className="flex items-center gap-1.5 text-purple-400">
-                    <span>🌀</span> {lang === 'en' ? 'Imploding Kittens:' : 'Số Mèo Tự Nổ (Imploding):'}
-                  </span>
-                  <span className="font-mono text-purple-400 font-black text-sm">{implodingKittensCount} {lang === 'en' ? 'cards' : 'lá'}</span>
+            <div className={`grid grid-cols-1 ${hasImploding ? 'sm:grid-cols-2' : ''} gap-3`}>
+              {/* Thẻ Mèo Nổ (Exploding Kittens) - CỐ ĐỊNH / TỰ ĐỘNG CÂN BẰNG, KHÔNG CHO CHỈNH TỰ DO */}
+              <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-3 flex flex-col justify-between">
+                <div>
+                  <div className="flex justify-between items-center text-xs font-bold text-slate-200 mb-1">
+                    <span className="flex items-center gap-1.5 text-rose-400 font-black">
+                      <span>💣</span> {lang === 'en' ? 'Exploding Kittens:' : 'Mèo Nổ Thường (Exploding):'}
+                    </span>
+                    <span className="font-mono text-rose-400 font-black text-sm">
+                      {explodingKittensCount} {lang === 'en' ? 'cards' : 'lá'}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 leading-relaxed mt-1">
+                    {hasImploding 
+                      ? (lang === 'en' 
+                          ? `Auto-balanced = ${totalBombs} total bombs - ${implodingKittensCount} Imploding Kittens.` 
+                          : `Tự động cân bằng = Tổng ${totalBombs} bom - ${implodingKittensCount} Mèo Tự Nổ.`) 
+                      : (lang === 'en' 
+                          ? `Fixed = ${totalBombs} cards (${playerCount} players - 1).` 
+                          : `Cố định = ${totalBombs} lá (${playerCount} người chơi - 1).`)}
+                  </p>
                 </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="4"
-                  value={implodingKittensCount}
-                  onChange={e => setImplodingKittensCount(parseInt(e.target.value))}
-                  className="w-full accent-purple-500 cursor-pointer"
-                />
+                <div className="mt-2 text-[10px] font-bold text-slate-500 flex items-center gap-1">
+                  <span>🔒</span>
+                  <span>{lang === 'en' ? 'Locked (Prevents game deadlock)' : 'Khóa cố định (Tránh lỗi game)'}</span>
+                </div>
               </div>
-            )}
+
+              {/* Thẻ Mèo Tự Nổ (Imploding Kittens) - CHỈ HIỆN KHI BẬT MỞ RỘNG VÀ ĐƯỢC PHÉP CHỈNH TỪ 0 ĐẾN TOTAL BOMBS */}
+              {hasImploding && (
+                <div className="bg-purple-950/30 border border-purple-500/40 rounded-xl p-3 flex flex-col justify-between">
+                  <div>
+                    <div className="flex justify-between items-center text-xs font-bold text-slate-200 mb-1">
+                      <span className="flex items-center gap-1.5 text-purple-400 font-black">
+                        <span>🌀</span> {lang === 'en' ? 'Imploding Kittens:' : 'Mèo Tự Nổ (Imploding):'}
+                      </span>
+                      <span className="font-mono text-purple-400 font-black text-sm">
+                        {implodingKittensCount} {lang === 'en' ? 'cards' : 'lá'}
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max={totalBombs}
+                      value={implodingKittensCount}
+                      onChange={e => {
+                        const val = Math.max(0, Math.min(totalBombs, parseInt(e.target.value) || 0));
+                        setImplodingKittensCount(val);
+                      }}
+                      className="w-full accent-purple-500 cursor-pointer my-1.5"
+                    />
+                    <div className="flex justify-between text-[9px] text-slate-400">
+                      <span>0 ({lang === 'en' ? 'Min' : 'Thấp nhất'})</span>
+                      <span className="text-purple-300 font-bold">{lang === 'en' ? 'Adjustable' : 'Tùy chỉnh'}</span>
+                      <span>{totalBombs} ({lang === 'en' ? 'Max' : 'Tối đa'})</span>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-purple-300/80 leading-relaxed mt-1">
+                    {lang === 'en'
+                      ? 'Adjustable from 0 to total bombs. Defuse is useless against this card!'
+                      : 'Có thể chỉnh từ 0 đến tối đa tổng bom. Rút trúng lần 2 sẽ chết ngay!'}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Thống kê tổng quan */}
@@ -242,7 +294,7 @@ export const CustomDeckModal: React.FC<CustomDeckModalProps> = ({
               {lang === 'en' ? 'Total regular cards:' : 'Tổng số lá bài thường:'} <strong className="text-yellow-400">{totalRegularCards} {lang === 'en' ? 'cards' : 'lá'}</strong>
             </span>
             <span className="text-slate-300">
-              {lang === 'en' ? 'Total lethal cards:' : 'Tổng số bom:'} <strong className="text-rose-500">{explodingKittensCount + (hasImploding ? implodingKittensCount : 0)} {lang === 'en' ? 'cards' : 'lá'}</strong>
+              {lang === 'en' ? 'Total lethal cards:' : 'Tổng số bom:'} <strong className="text-rose-500 font-mono font-black">{totalBombs} {lang === 'en' ? 'cards' : 'lá'}</strong> <span className="text-slate-500 text-[10px]">({explodingKittensCount} 💣 + {hasImploding ? implodingKittensCount : 0} 🌀)</span>
             </span>
           </div>
 
