@@ -30,15 +30,26 @@ export const CustomDeckModal: React.FC<CustomDeckModalProps> = ({
     return config?.activeExpansions ? config.activeExpansions.includes('streaking') : false;
   });
 
+  const [streakingKittensCount, setStreakingKittensCount] = useState<number>(() => {
+    if (config?.streakingKittensCount !== undefined) {
+      return Math.max(0, Math.min(1, config.streakingKittensCount));
+    }
+    if (config?.cardCounts?.['streaking_kitten'] !== undefined) {
+      return Math.max(0, Math.min(1, config.cardCounts['streaking_kitten']));
+    }
+    return config?.activeExpansions?.includes('streaking') ? 1 : 1;
+  });
+
   const activePacks: string[] = ['base'];
   if (hasImploding) activePacks.push('imploding');
   if (hasStreaking) activePacks.push('streaking');
 
   const allCards = CardRegistry.getAllCards(activePacks).filter(
-    c => c.type !== 'KITTEN' && c.type !== 'DEFUSE'
+    c => c.type !== 'KITTEN' && c.type !== 'DEFUSE' && c.id !== 'streaking_kitten'
   );
 
-  const totalBombs = hasStreaking ? playerCount : Math.max(1, playerCount - 1);
+  const totalBombs = (hasStreaking && streakingKittensCount > 0) ? playerCount : Math.max(1, playerCount - 1);
+  const minRequiredBombs = (hasStreaking && streakingKittensCount > 0) ? playerCount : Math.max(1, playerCount - 1);
   const defaultHandSize = playerCount <= 5 ? 7 : 4;
   const [handSize, setHandSize] = useState<number>(config?.handSize ?? defaultHandSize);
   const [defuseInDeck, setDefuseInDeck] = useState<number>(config?.defuseInDeck ?? 2);
@@ -53,6 +64,8 @@ export const CustomDeckModal: React.FC<CustomDeckModalProps> = ({
   });
 
   const explodingKittensCount = totalBombs - (hasImploding ? implodingKittensCount : 0);
+  const currentTotalBombs = explodingKittensCount + (hasImploding ? implodingKittensCount : 0);
+  const isBombCountValid = currentTotalBombs >= minRequiredBombs;
 
   const [cardCounts, setCardCounts] = useState<Record<string, number>>(() => {
     const initial: Record<string, number> = {};
@@ -78,7 +91,18 @@ export const CustomDeckModal: React.FC<CustomDeckModalProps> = ({
   const handleToggleStreaking = () => {
     const nextHasStreaking = !hasStreaking;
     setHasStreaking(nextHasStreaking);
-    const nextTotalBombs = nextHasStreaking ? playerCount : Math.max(1, playerCount - 1);
+    const nextStreakingCount = nextHasStreaking ? 1 : 0;
+    setStreakingKittensCount(nextStreakingCount);
+    const nextTotalBombs = (nextHasStreaking && nextStreakingCount > 0) ? playerCount : Math.max(1, playerCount - 1);
+    if (hasImploding) {
+      setImplodingKittensCount(prev => Math.min(prev, nextTotalBombs));
+    }
+  };
+
+  const handleStreakingCountChange = (count: number) => {
+    const nextCount = Math.max(0, Math.min(1, count));
+    setStreakingKittensCount(nextCount);
+    const nextTotalBombs = (hasStreaking && nextCount > 0) ? playerCount : Math.max(1, playerCount - 1);
     if (hasImploding) {
       setImplodingKittensCount(prev => Math.min(prev, nextTotalBombs));
     }
@@ -95,11 +119,12 @@ export const CustomDeckModal: React.FC<CustomDeckModalProps> = ({
   const handleReset = () => {
     setHasImploding(false);
     setHasStreaking(false);
+    setStreakingKittensCount(1);
     setHandSize(playerCount <= 5 ? 7 : 4);
     setDefuseInDeck(2);
     setImplodingKittensCount(0);
     const resetCounts: Record<string, number> = {};
-    const baseCards = CardRegistry.getAllCards(['base']).filter(c => c.type !== 'KITTEN' && c.type !== 'DEFUSE');
+    const baseCards = CardRegistry.getAllCards(['base']).filter(c => c.type !== 'KITTEN' && c.type !== 'DEFUSE' && c.id !== 'streaking_kitten');
     for (const card of baseCards) {
       resetCounts[card.id] = card.defaultCount;
     }
@@ -107,14 +132,21 @@ export const CustomDeckModal: React.FC<CustomDeckModalProps> = ({
   };
 
   const handleSave = () => {
+    if (!isBombCountValid) return;
     const finalImploding = hasImploding ? Math.max(0, Math.min(totalBombs, implodingKittensCount)) : 0;
     const finalExploding = totalBombs - finalImploding;
+    const finalStreaking = hasStreaking ? streakingKittensCount : 0;
+    const finalCardCounts = {
+      ...cardCounts,
+      streaking_kitten: finalStreaking
+    };
     onSave({
       handSize,
       defuseInDeck,
-      cardCounts,
+      cardCounts: finalCardCounts,
       explodingKittensCount: finalExploding,
       implodingKittensCount: finalImploding,
+      streakingKittensCount: finalStreaking,
       activeExpansions: activePacks
     });
     onClose();
@@ -250,20 +282,20 @@ export const CustomDeckModal: React.FC<CustomDeckModalProps> = ({
             </div>
           </div>
 
-          {/* Cấu hình Số lượng Bom: Cố định Tổng số bom = Số người chơi - 1 */}
+          {/* Cấu hình Số lượng Bom & Mèo Đặc Biệt (Kitten Cards) */}
           <div className="bg-slate-950/80 p-3.5 sm:p-4 rounded-xl border border-slate-800 space-y-3">
             <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
               <div className="flex items-center gap-2">
-                <span className="text-base sm:text-lg">💣</span>
+                <span className="text-base sm:text-lg">🐱</span>
                 <div>
                   <h4 className="text-xs sm:text-sm font-black text-rose-400 uppercase tracking-wide">
-                    {lang === 'en' ? 'Lethal Bomb Count (Fixed Rule)' : 'Số Lượng Bom (Cố Định Chuẩn Luật)'}
+                    {lang === 'en' ? 'Special Kitten Cards & Lethal Bombs' : 'Các Thẻ Mèo Đặc Biệt & Số Lượng Bom'}
                   </h4>
                   <p className="text-[10px] text-slate-400">
-                    {hasStreaking
+                    {hasStreaking && streakingKittensCount > 0
                       ? (lang === 'en'
-                          ? `With Streaking Kittens, total lethal bombs = ${playerCount} cards (1 player can secretly hold a bomb).`
-                          : `Khi bật Streaking Kittens, tổng số bom = ${playerCount} lá (vì 1 người có thể ôm bom an toàn).`)
+                          ? `With 1 Streaking Kitten, total lethal bombs = ${playerCount} cards (1 player can secretly hold a bomb).`
+                          : `Với 1 lá Streaking Kitten, tổng số bom = ${playerCount} lá (vì 1 người có thể ôm bom an toàn).`)
                       : (lang === 'en' 
                           ? `Total lethal bombs is strictly fixed = ${playerCount} - 1 = ${totalBombs} cards to ensure 1 sole winner.` 
                           : `Tổng số bom bắt buộc cố định = ${playerCount} - 1 = ${totalBombs} lá để luôn tìm ra duy nhất 1 người thắng.`)}
@@ -275,13 +307,30 @@ export const CustomDeckModal: React.FC<CustomDeckModalProps> = ({
               </div>
             </div>
 
-            <div className={`grid grid-cols-1 ${hasImploding ? 'sm:grid-cols-2' : ''} gap-3`}>
+            {/* Cảnh báo nếu số bom không hợp lệ */}
+            {!isBombCountValid && (
+              <div className="p-2.5 bg-rose-950/80 border-2 border-rose-500 text-rose-200 rounded-xl text-xs flex items-start gap-2">
+                <span className="text-lg">⚠️</span>
+                <div>
+                  <div className="font-black uppercase tracking-wide">
+                    {lang === 'en' ? 'Invalid Bomb Count!' : 'Số Lượng Bom Không Hợp Lệ!'}
+                  </div>
+                  <div className="text-[11px] text-rose-300/90 mt-0.5">
+                    {lang === 'en'
+                      ? `At least ${minRequiredBombs} bombs are required for ${playerCount} players. Otherwise the deck will run out of bombs with 2 survivors!`
+                      : `Cần tối thiểu ${minRequiredBombs} bom cho ${playerCount} người chơi. Nếu ít hơn, xấp bài sẽ cạn sạch bom khi còn 2 người và không thể tìm ra người chiến thắng!`}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className={`grid grid-cols-1 ${hasImploding && hasStreaking ? 'sm:grid-cols-3' : (hasImploding || hasStreaking) ? 'sm:grid-cols-2' : ''} gap-3`}>
               {/* Thẻ Mèo Nổ (Exploding Kittens) - CỐ ĐỊNH / TỰ ĐỘNG CÂN BẰNG, KHÔNG CHO CHỈNH TỰ DO */}
               <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-3 flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-center text-xs font-bold text-slate-200 mb-1">
                     <span className="flex items-center gap-1.5 text-rose-400 font-black">
-                      <span>💣</span> {lang === 'en' ? 'Exploding Kittens:' : 'Mèo Nổ Thường (Exploding):'}
+                      <span>💣</span> {lang === 'en' ? 'Exploding Kittens:' : 'Mèo Nổ (Exploding):'}
                     </span>
                     <span className="font-mono text-rose-400 font-black text-sm">
                       {explodingKittensCount} {lang === 'en' ? 'cards' : 'lá'}
@@ -290,7 +339,7 @@ export const CustomDeckModal: React.FC<CustomDeckModalProps> = ({
                   <p className="text-[10px] text-slate-400 leading-relaxed mt-1">
                     {hasImploding 
                       ? (lang === 'en' 
-                          ? `Auto-balanced = ${totalBombs} total bombs - ${implodingKittensCount} Imploding Kittens.` 
+                          ? `Auto-balanced = ${totalBombs} total - ${implodingKittensCount} Imploding.` 
                           : `Tự động cân bằng = Tổng ${totalBombs} bom - ${implodingKittensCount} Mèo Tự Nổ.`) 
                       : (lang === 'en' 
                           ? `Fixed = ${totalBombs} cards (${playerCount} players - 1).` 
@@ -299,7 +348,7 @@ export const CustomDeckModal: React.FC<CustomDeckModalProps> = ({
                 </div>
                 <div className="mt-2 text-[10px] font-bold text-slate-500 flex items-center gap-1">
                   <span>🔒</span>
-                  <span>{lang === 'en' ? 'Locked (Prevents game deadlock)' : 'Khóa cố định (Tránh lỗi game)'}</span>
+                  <span>{lang === 'en' ? 'Auto-balanced' : 'Tự cân bằng theo tổng bom'}</span>
                 </div>
               </div>
 
@@ -334,8 +383,59 @@ export const CustomDeckModal: React.FC<CustomDeckModalProps> = ({
                   </div>
                   <p className="text-[10px] text-purple-300/80 leading-relaxed mt-1">
                     {lang === 'en'
-                      ? 'Adjustable from 0 to total bombs. Defuse is useless against this card!'
+                      ? 'Adjustable from 0 to total bombs. Defuse is useless!'
                       : 'Có thể chỉnh từ 0 đến tối đa tổng bom. Rút trúng lần 2 sẽ chết ngay!'}
+                  </p>
+                </div>
+              )}
+
+              {/* Thẻ Mèo Khỏa Thân (Streaking Kitten ⚡) - TỐI ĐA 1 LÁ, TỐI THIỂU 0 LÁ */}
+              {hasStreaking && (
+                <div className="bg-orange-950/30 border border-orange-500/40 rounded-xl p-3 flex flex-col justify-between">
+                  <div>
+                    <div className="flex justify-between items-center text-xs font-bold text-slate-200 mb-1">
+                      <span className="flex items-center gap-1.5 text-orange-400 font-black">
+                        <span>⚡</span> {lang === 'en' ? 'Streaking Kitten:' : 'Mèo Khỏa Thân (Streaking):'}
+                      </span>
+                      <span className="font-mono text-orange-400 font-black text-sm">
+                        {streakingKittensCount} {lang === 'en' ? 'card' : 'lá'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 my-2 bg-slate-900/80 p-1.5 rounded-lg border border-orange-500/20">
+                      <span className="text-[10px] text-slate-300 font-bold">
+                        {lang === 'en' ? 'Quantity (0 - 1):' : 'Số lượng (0 - 1):'}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleStreakingCountChange(0)}
+                          className={`w-7 h-7 rounded-lg font-bold text-xs flex items-center justify-center transition cursor-pointer ${
+                            streakingKittensCount === 0 
+                              ? 'bg-orange-500 text-slate-950 shadow-md font-black' 
+                              : 'bg-slate-800 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          0
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleStreakingCountChange(1)}
+                          className={`w-7 h-7 rounded-lg font-bold text-xs flex items-center justify-center transition cursor-pointer ${
+                            streakingKittensCount === 1 
+                              ? 'bg-orange-500 text-slate-950 shadow-md font-black' 
+                              : 'bg-slate-800 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          1
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-orange-300/80 leading-relaxed mt-1">
+                    {lang === 'en'
+                      ? 'Min 0, Max 1 card. Allows secretly holding 1 Exploding Kitten!'
+                      : 'Tối thiểu 0, tối đa 1 lá. Cho phép bí mật ôm 1 Mèo Nổ trên tay an toàn!'}
                   </p>
                 </div>
               )}
@@ -419,7 +519,8 @@ export const CustomDeckModal: React.FC<CustomDeckModalProps> = ({
             </button>
             <button
               onClick={handleSave}
-              className="px-4 py-1.5 text-xs font-bold text-slate-900 bg-yellow-400 hover:bg-yellow-300 rounded-lg shadow-md transition cursor-pointer"
+              disabled={!isBombCountValid}
+              className="px-4 py-1.5 text-xs font-bold text-slate-900 bg-yellow-400 hover:bg-yellow-300 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg shadow-md transition cursor-pointer"
             >
               {lang === 'en' ? 'Save Settings' : 'Lưu Cấu Hình'}
             </button>

@@ -88,7 +88,8 @@ export interface CustomDeckConfig {
   cardCounts: Record<string, number>; // Số lượng từng lá bài
   explodingKittensCount?: number; // Tùy chỉnh riêng số Mèo Nổ
   implodingKittensCount?: number; // Tùy chỉnh riêng số Mèo Tự Nổ
-  activeExpansions?: string[];  // ['base', 'imploding']
+  streakingKittensCount?: number; // Tùy chỉnh riêng số Mèo Khỏa Thân (0 hoặc 1)
+  activeExpansions?: string[];  // ['base', 'imploding', 'streaking']
 }
 
 export interface GameSettings {

@@ -119,3 +119,4 @@ export const STREAKING_KITTENS_CARDS: CardDefinition[] = [
     defaultCount: 2
   }
 ];
+

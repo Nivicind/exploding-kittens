@@ -26,40 +26,44 @@ export const SeeFutureModal: React.FC<SeeFutureModalProps> = ({ cards, onClose }
           </div>
 
           <h2 className="text-2xl sm:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-300 via-purple-200 to-pink-300 uppercase tracking-widest drop-shadow-[0_0_20px_rgba(217,70,239,0.5)]">
-            Tương Lai Của Xấp Bài
+            Tương Lai Của Xấp Bài ({cards.length}X)
           </h2>
           <p className="text-xs sm:text-sm text-slate-200 mt-1 max-w-md mx-auto drop-shadow">
-            Chỉ riêng bạn nhìn thấy! Đây là <strong>3 lá bài tiếp theo</strong> trên đỉnh bộ bài (xếp theo thứ tự sẽ được rút):
+            Chỉ riêng bạn nhìn thấy! Đây là <strong>{cards.length} lá bài tiếp theo</strong> trên đỉnh bộ bài (xếp theo thứ tự sẽ được rút):
           </p>
         </div>
 
-        {/* 3 Lá bài đứng song song, căn đều chuẩn xác 100% theo grid 3 cột */}
-        <div className="grid grid-cols-3 gap-3 sm:gap-6 w-full max-w-xl sm:max-w-2xl mx-auto items-start justify-items-center my-2">
+        {/* Các lá bài đứng song song, căn đều chuẩn xác */}
+        <div className={`grid ${cards.length === 5 ? 'grid-cols-5 gap-1.5 sm:gap-3 max-w-2xl' : cards.length > 3 ? 'grid-cols-4 sm:grid-cols-5 gap-2 max-w-2xl' : 'grid-cols-3 gap-3 sm:gap-6 max-w-xl sm:max-w-2xl'} w-full mx-auto items-start justify-items-center my-2`}>
           {cards.map((card, idx) => (
             <div
               key={card.uid || idx}
               className="flex flex-col items-center w-full transform hover:scale-105 hover:-translate-y-2 transition-all duration-300"
             >
-              {/* Huy hiệu thứ tự rút bài cố định chiều cao giúp 3 lá bài ngang hàng nhau 100% */}
-              <div className="h-7 sm:h-8 flex items-center justify-center mb-2 w-full">
-                <span className={`px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-wider text-center whitespace-nowrap border shadow-md ${
+              {/* Huy hiệu thứ tự rút bài cố định chiều cao */}
+              <div className="h-7 sm:h-8 flex items-center justify-center mb-1.5 w-full">
+                <span className={`px-1.5 xs:px-2.5 py-0.5 rounded-full text-[9px] sm:text-xs font-black uppercase tracking-wider text-center whitespace-nowrap border shadow-md ${
                   idx === 0
                     ? 'bg-rose-900/80 text-rose-200 border-rose-400 ring-2 ring-rose-500/50'
                     : idx === 1
                     ? 'bg-amber-900/80 text-amber-200 border-amber-400'
-                    : 'bg-fuchsia-900/80 text-fuchsia-200 border-fuchsia-400'
+                    : idx === 2
+                    ? 'bg-fuchsia-900/80 text-fuchsia-200 border-fuchsia-400'
+                    : 'bg-indigo-900/80 text-indigo-200 border-indigo-400'
                 }`}>
                   {idx === 0
-                    ? '🥇 1. Đỉnh Xấp'
+                    ? '🥇 1. Đỉnh'
                     : idx === 1
-                    ? '🥈 2. Tiếp Theo'
-                    : '🥉 3. Kế Tiếp'}
+                    ? '🥈 2. Kế'
+                    : idx === 2
+                    ? '🥉 3. Sau'
+                    : `#${idx + 1}`}
                 </span>
               </div>
 
-              {/* Thẻ bài kích thước chuẩn sắc nét */}
+              {/* Thẻ bài kích thước sắc nét */}
               <div className="filter drop-shadow-[0_15px_30px_rgba(0,0,0,0.9)]">
-                <CardView card={card} isCompact={false} />
+                <CardView card={card} isMini={cards.length > 3} isCompact={cards.length <= 3} />
               </div>
             </div>
           ))}

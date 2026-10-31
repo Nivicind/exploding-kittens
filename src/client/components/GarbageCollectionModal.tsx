@@ -95,3 +95,4 @@ export const GarbageCollectionModal: React.FC<GarbageCollectionModalProps> = ({
     </div>
   );
 };
+

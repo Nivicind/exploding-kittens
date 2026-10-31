@@ -19,6 +19,7 @@ export const AlterFutureModal: React.FC<AlterFutureModalProps> = ({
   lang = 'vi'
 }) => {
   const [items, setItems] = useState<CardInstance[]>(initialCards);
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
 
   const handleSwap = (idx1: number, idx2: number) => {
     if (idx1 < 0 || idx1 >= items.length || idx2 < 0 || idx2 >= items.length) return;
@@ -30,14 +31,28 @@ export const AlterFutureModal: React.FC<AlterFutureModalProps> = ({
     setItems(next);
   };
 
+  const handleCardClick = (idx: number) => {
+    if (selectedIdx === null) {
+      sound.playCardPlay();
+      setSelectedIdx(idx);
+    } else if (selectedIdx === idx) {
+      setSelectedIdx(null);
+    } else {
+      handleSwap(selectedIdx, idx);
+      setSelectedIdx(null);
+    }
+  };
+
   const handleConfirm = () => {
     sound.playCardPlay();
     onConfirm(items);
   };
 
+  const isManyCards = items.length > 3;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-3 sm:p-4 animate-fade-in select-none">
-      <div className="bg-slate-900 border-4 border-purple-500 rounded-3xl p-5 sm:p-8 max-w-lg w-full text-center space-y-4 shadow-2xl shadow-purple-950/80">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-2 sm:p-4 animate-fade-in select-none">
+      <div className="bg-slate-900 border-4 border-purple-500 rounded-3xl p-4 sm:p-7 max-w-xl w-full text-center space-y-3.5 shadow-2xl shadow-purple-950/80">
         {/* Header */}
         <div>
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-500/20 border border-purple-400/50 text-purple-300 text-xs font-black uppercase tracking-wider mb-2">
@@ -47,35 +62,36 @@ export const AlterFutureModal: React.FC<AlterFutureModalProps> = ({
           <h3 className="text-xl sm:text-2xl font-black text-purple-400 uppercase tracking-wide">
             {lang === 'en' ? `Rearrange Top ${items.length} Cards` : `Sắp Xếp Lại ${items.length} Lá Trên Cùng`}
           </h3>
-          <p className="text-[11px] sm:text-xs text-slate-300 mt-1">
+          <p className="text-[11px] sm:text-xs text-slate-300 mt-1 max-w-md mx-auto">
             {lang === 'en' 
-              ? `Drag and drop or use arrows to rearrange the top ${items.length} cards in the draw pile:` 
-              : `Kéo thả hoặc bấm nút mũi tên để hoán đổi thứ tự ${items.length} lá trên cùng của xấp bài rút:`}
+              ? `Tap two cards to swap, drag to reorder, or use the ◀ ▶ buttons:` 
+              : `Chạm 2 lá bất kỳ để đổi chỗ, kéo thả hoặc dùng nút mũi tên ◀ ▶:`}
           </p>
         </div>
 
-        {/* Khung Kéo Thả các lá bài (Reorder Group) */}
+        {/* Khung Kéo Thả / Chạm hoán đổi các lá bài */}
         <Reorder.Group
           axis="x"
           values={items}
           onReorder={setItems}
-          className="flex items-center justify-start sm:justify-center gap-2.5 sm:gap-4 py-3 overflow-x-auto max-w-full px-2"
+          className="flex items-center justify-center gap-1.5 xs:gap-2 sm:gap-3 py-2 max-w-full px-1"
         >
           {items.map((card, idx) => {
             const isTop = idx === 0;
+            const isSelected = selectedIdx === idx;
             const slotTitle = isTop
-              ? (lang === 'en' ? '🥇 TOP (1ST)' : '🥇 ĐỈNH (LÁ 1)')
-              : (lang === 'en' ? `Card ${idx + 1}` : `Lá thứ ${idx + 1}`);
+              ? (lang === 'en' ? '🥇 TOP' : '🥇 ĐỈNH')
+              : (lang === 'en' ? `#${idx + 1}` : `Lá ${idx + 1}`);
 
             return (
               <Reorder.Item
                 key={card.uid}
                 value={card}
-                className="flex flex-col items-center gap-1.5 flex-shrink-0 cursor-grab active:cursor-grabbing"
+                className="flex flex-col items-center gap-1 flex-shrink-0 cursor-grab active:cursor-grabbing"
               >
                 {/* Huy hiệu thứ tự */}
                 <div
-                  className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider shadow-md ${
+                  className={`px-1.5 xs:px-2 py-0.5 rounded-full text-[9px] xs:text-[10px] font-black uppercase tracking-wider shadow-md ${
                     isTop
                       ? 'bg-purple-600 text-white ring-2 ring-purple-300 animate-pulse'
                       : 'bg-slate-800 text-slate-300 border border-slate-700'
@@ -86,29 +102,44 @@ export const AlterFutureModal: React.FC<AlterFutureModalProps> = ({
 
                 {/* Thẻ bài */}
                 <motion.div
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="rounded-2xl transition-transform"
+                  whileHover={{ scale: 1.04 }}
+                  whileTap={{ scale: 0.96 }}
+                  onClick={() => handleCardClick(idx)}
+                  className={`rounded-2xl transition-all ${
+                    isSelected ? 'ring-4 ring-yellow-400 scale-105 z-20 shadow-lg shadow-yellow-500/40' : ''
+                  }`}
                 >
-                  <CardView card={card} isSelected={false} lang={lang} />
+                  <CardView
+                    card={card}
+                    isSelected={isSelected}
+                    isMini={isManyCards}
+                    isCompact={!isManyCards}
+                    lang={lang}
+                  />
                 </motion.div>
 
                 {/* Cụm nút mũi tên hỗ trợ hoán đổi nhanh trên điện thoại */}
-                <div className="flex items-center gap-1 mt-1">
+                <div className="flex items-center gap-1 mt-0.5">
                   <button
                     type="button"
-                    onClick={() => handleSwap(idx, idx - 1)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSwap(idx, idx - 1);
+                    }}
                     disabled={idx === 0}
-                    className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold disabled:opacity-30 disabled:pointer-events-none cursor-pointer border border-slate-700"
+                    className="w-6 h-6 xs:w-7 xs:h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold disabled:opacity-20 disabled:pointer-events-none cursor-pointer border border-slate-700 active:scale-90 flex items-center justify-center"
                     title={lang === 'en' ? 'Move Left' : 'Dời Trái'}
                   >
                     ◀
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleSwap(idx, idx + 1)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSwap(idx, idx + 1);
+                    }}
                     disabled={idx === items.length - 1}
-                    className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold disabled:opacity-30 disabled:pointer-events-none cursor-pointer border border-slate-700"
+                    className="w-6 h-6 xs:w-7 xs:h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold disabled:opacity-20 disabled:pointer-events-none cursor-pointer border border-slate-700 active:scale-90 flex items-center justify-center"
                     title={lang === 'en' ? 'Move Right' : 'Dời Phải'}
                   >
                     ▶
@@ -119,12 +150,20 @@ export const AlterFutureModal: React.FC<AlterFutureModalProps> = ({
           })}
         </Reorder.Group>
 
+        {selectedIdx !== null && (
+          <div className="text-[11px] font-bold text-yellow-300 animate-pulse">
+            {lang === 'en'
+              ? `Card #${selectedIdx + 1} selected. Tap another card to swap places!`
+              : `Đã chọn lá thứ #${selectedIdx + 1}. Chạm vào lá khác để đổi chỗ!`}
+          </div>
+        )}
+
         {/* Nút bấm xác nhận & Giữ nguyên */}
-        <div className="space-y-2 pt-2">
+        <div className="space-y-2 pt-1">
           <button
             type="button"
             onClick={handleConfirm}
-            className="w-full py-3.5 bg-gradient-to-r from-purple-600 to-indigo-500 hover:from-purple-500 hover:to-indigo-400 text-white font-black text-sm uppercase rounded-2xl shadow-xl shadow-purple-600/30 transition transform active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full py-3 sm:py-3.5 bg-gradient-to-r from-purple-600 to-indigo-500 hover:from-purple-500 hover:to-indigo-400 text-white font-black text-xs sm:text-sm uppercase rounded-2xl shadow-xl shadow-purple-600/30 transition transform active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
           >
             <span>✓</span>
             <span>{lang === 'en' ? 'CONFIRM NEW CARD ORDER' : 'XÁC NHẬN THỨ TỰ BÀI MỚI'}</span>

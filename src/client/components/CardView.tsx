@@ -9,6 +9,7 @@ interface CardViewProps {
   isSelected?: boolean;
   onClick?: () => void;
   isCompact?: boolean;
+  isMini?: boolean;
   disabled?: boolean;
   highlight?: boolean;
   isBlind?: boolean;
@@ -55,6 +56,7 @@ export const CardView: React.FC<CardViewProps> = ({
   isSelected = false,
   onClick,
   isCompact = false,
+  isMini = false,
   disabled = false,
   highlight = false,
   isBlind = false,
@@ -66,6 +68,23 @@ export const CardView: React.FC<CardViewProps> = ({
 
   // Nếu người chơi đang bị Mù (Curse of Cat Butt), lá bài trên tay bị úp thành hình Mông Mèo 🍑
   if (isBlind) {
+    if (isMini) {
+      return (
+        <div
+          onClick={!disabled ? onClick : undefined}
+          style={style}
+          className={`relative w-[56px] h-[88px] xs:w-[64px] xs:h-[100px] sm:w-[84px] sm:h-[126px] rounded-xl border-2 border-pink-500 bg-gradient-to-br from-pink-950 via-rose-950 to-slate-950 p-1 flex flex-col justify-between items-center select-none text-white overflow-hidden ${
+            isSelected ? 'ring-3 ring-yellow-400 scale-105 z-30 shadow-lg' : ''
+          } ${className}`}
+        >
+          <div className="text-[6.5px] font-black uppercase text-pink-300 bg-black/45 px-1 py-0.5 rounded-full border border-pink-500/40">
+            🍑 MÔNG
+          </div>
+          <span className="text-2xl filter drop-shadow my-auto">🍑</span>
+          <div className="text-[6px] text-pink-400/60 font-mono font-bold">EK</div>
+        </div>
+      );
+    }
     return (
       <div
         onClick={!disabled ? onClick : undefined}
@@ -117,6 +136,33 @@ export const CardView: React.FC<CardViewProps> = ({
   const cardBadge = i18nData?.badge || theme.badge;
   const subName = i18nData?.subName || (currentLang === 'en' ? def.nameVi : def.nameEn);
   const descText = i18nData?.description || def.description;
+
+  // Kiểu dáng thẻ bài siêu thu nhỏ (Mini - chuyên dụng cho Alter/See 5X trên mobile)
+  if (isMini) {
+    return (
+      <div
+        onClick={!disabled ? onClick : undefined}
+        style={{ backgroundColor: theme.bg, borderColor: isSelected ? '#facc15' : theme.border, ...style }}
+        className={`relative w-[56px] h-[88px] xs:w-[64px] xs:h-[100px] sm:w-[84px] sm:h-[126px] rounded-xl border-2 p-1 flex flex-col justify-between select-none transition-all duration-200 card-shadow text-white ${
+          isSelected ? 'ring-3 ring-yellow-400 scale-105 z-30 shadow-lg' : ''
+        } ${!disabled && onClick ? 'cursor-pointer hover:scale-105' : 'cursor-default'} ${disabled ? 'opacity-50 grayscale cursor-not-allowed' : ''} ${className}`}
+      >
+        <div className="flex items-center justify-between px-0.5">
+          <span className="text-[11px] sm:text-sm">{def.icon}</span>
+          <span className="text-[6px] sm:text-[7.5px] font-black tracking-tight px-1 py-0.2 rounded bg-black/50 text-white truncate max-w-[34px] sm:max-w-[48px]">
+            {cardBadge}
+          </span>
+        </div>
+        <div className="bg-white/95 text-slate-900 rounded-lg p-0.5 my-0.5 text-center shadow-inner border border-black/20">
+          <div className="text-base sm:text-xl leading-none py-0.5">{def.icon}</div>
+          <p className="text-[7.5px] sm:text-[9.5px] font-black leading-tight line-clamp-1">{cardName}</p>
+        </div>
+        <div className="text-[6px] sm:text-[7.5px] font-bold text-center text-white/90 truncate px-0.5">
+          {subName}
+        </div>
+      </div>
+    );
+  }
 
   // Kiểu dáng thẻ bài thu nhỏ (Compact cho modal hoặc history)
   if (isCompact) {

@@ -2,6 +2,7 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CardInstance } from '../../engine/types';
 import { CardView } from './CardView';
+import { CardBack } from './CardBack';
 
 export interface FlyingCardTask {
   id: string;
@@ -49,13 +50,8 @@ export const FlyingCardOverlay: React.FC<FlyingCardOverlayProps> = ({
             className="absolute -translate-x-1/2 -translate-y-1/2"
           >
             {task.isFaceDown || !task.card ? (
-              // Mặt sau của thẻ bài bốc (Mèo Nổ 💣)
-              <div className="w-24 h-36 sm:w-28 sm:h-40 rounded-2xl bg-gradient-to-b from-rose-900 to-slate-950 border-3 border-rose-500 shadow-2xl flex flex-col items-center justify-center p-2 text-center">
-                <span className="text-3xl mb-1 drop-shadow-md">💣</span>
-                <span className="text-[10px] font-black text-rose-300 uppercase tracking-widest">
-                  EXPLODING
-                </span>
-              </div>
+              // Mặt sau thống nhất (Mèo Nổ - không icon bom)
+              <CardBack isCompact={true} />
             ) : (
               // Mặt trước thẻ bài ngửa
               <CardView card={task.card} isCompact={true} />

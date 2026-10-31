@@ -74,10 +74,15 @@ export class GameStateManager {
     const handSize = config?.handSize ?? (numPlayers <= 5 ? 7 : 4);
     const defuseInDeck = config?.defuseInDeck ?? 2;
 
+    // Số lượng Streaking Kitten (0 hoặc 1)
+    const streakingKittensCount = config?.streakingKittensCount !== undefined
+      ? config.streakingKittensCount
+      : (hasStreaking ? (config?.cardCounts?.['streaking_kitten'] ?? 1) : 0);
+
     // Tổng số bom gây chết:
-    // Khi có Streaking Kittens: tổng số bom = numPlayers (vì 1 người có thể giấu 1 bom an toàn trên tay)
-    // Khi không có: tổng số bom = Math.max(1, numPlayers - 1)
-    const totalBombs = hasStreaking ? numPlayers : Math.max(1, numPlayers - 1);
+    // Khi có Streaking Kittens (số lượng >= 1): tổng số bom = numPlayers (vì 1 người có thể giấu 1 bom an toàn trên tay)
+    // Khi không có (hoặc số lượng streaking = 0): tổng số bom = Math.max(1, numPlayers - 1)
+    const totalBombs = (hasStreaking && streakingKittensCount > 0) ? numPlayers : Math.max(1, numPlayers - 1);
     let implodingKittensCount = 0;
     if (hasImploding) {
       if (config?.implodingKittensCount !== undefined) {
@@ -105,7 +110,9 @@ export class GameStateManager {
       if (def.type === 'KITTEN' || def.type === 'DEFUSE') continue;
 
       let count = def.defaultCount;
-      if (config?.cardCounts && config.cardCounts[def.id] !== undefined) {
+      if (def.id === 'streaking_kitten') {
+        count = streakingKittensCount;
+      } else if (config?.cardCounts && config.cardCounts[def.id] !== undefined) {
         count = config.cardCounts[def.id];
       }
 

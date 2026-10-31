@@ -133,6 +133,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   // Ref lưu vị trí avatar các đối thủ để tính toạ độ vệt sáng bay
   const opponentRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
+  // Ref lưu vị trí Trồng bài bốc để tính toạ độ animation bốc bài
+  const drawPileRef = useRef<HTMLDivElement>(null);
+
+  // ID của đối thủ đang được mở xem bảng chi tiết hiệu ứng (chat-bubble popover)
+  const [popoverOpponentId, setPopoverOpponentId] = useState<string | null>(null);
+
   const myPlayer = state.players.find(p => p.id === myPlayerId);
   const currentPlayer = state.players[state.currentPlayerIndex];
   const isMyTurn = state.status === 'playing' && currentPlayer?.id === myPlayerId;
@@ -297,11 +303,55 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       }
     }
 
-    // 2. Nếu có hiệu ứng Xào Bài (Shuffle) -> CHỈ kích hoạt animation tráo bài khi bài đã chính thức được xào (sau khi kết thúc Nope window)
-    if (latestLog.message.includes('đã xào lại toàn bộ xấp bài rút')) {
+    // 2. Nếu có hiệu ứng Xào Bài (Shuffle, Garbage Collection, Catomic Bomb) -> CHỈ kích hoạt animation tráo bài khi bài đã chính thức được xào
+    if (
+      latestLog.message.includes('đã xào lại toàn bộ xấp bài rút') ||
+      latestLog.message.includes('xáo đều') ||
+      latestLog.message.includes('Xe thu gom rác hoàn tất') ||
+      latestLog.message.includes('BOM HẠT NHÂN MÈO')
+    ) {
       setIsShufflingDrawPile(true);
       sound.playShuffle();
       setTimeout(() => setIsShufflingDrawPile(false), 1600);
+    }
+
+    // 2.05. Hiệu ứng rút bài bình thường (Normal Card Draw animation) cho đối thủ và AI Bot
+    if (
+      latestLog.playerId &&
+      latestLog.playerId !== myPlayerId &&
+      (latestLog.message.includes('rút 1 lá bài') ||
+       latestLog.message.includes('rút phải') ||
+       latestLog.message.includes('draws a card'))
+    ) {
+      const actorId = latestLog.playerId;
+      const drawPileElem = drawPileRef.current;
+      let fromX = window.innerWidth / 2 + 80;
+      let fromY = window.innerHeight / 2;
+      if (drawPileElem) {
+        const rect = drawPileElem.getBoundingClientRect();
+        fromX = rect.left + rect.width / 2;
+        fromY = rect.top + rect.height / 2;
+      }
+
+      let toX = window.innerWidth / 2;
+      let toY = 90;
+      const oppElem = opponentRefs.current[actorId];
+      if (oppElem) {
+        const rect = oppElem.getBoundingClientRect();
+        toX = rect.left + rect.width / 2;
+        toY = rect.top + rect.height / 2;
+      }
+
+      sound.playCardDraw();
+      setFlyingTasks(prev => [
+        ...prev,
+        {
+          id: `fly_draw_opp_${Date.now()}_${Math.random()}`,
+          from: { x: fromX, y: fromY },
+          to: { x: toX, y: toY },
+          isFaceDown: true
+        }
+      ]);
     }
 
     // 2.1. Phát hiện sự kiện người chơi mất kết nối, kết nối lại hoặc rời trận
@@ -540,6 +590,15 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
     sound.playCardDraw();
 
+    const drawPileElem = drawPileRef.current;
+    let fromX = window.innerWidth / 2 + 80;
+    let fromY = window.innerHeight / 2;
+    if (drawPileElem) {
+      const rect = drawPileElem.getBoundingClientRect();
+      fromX = rect.left + rect.width / 2;
+      fromY = rect.top + rect.height / 2;
+    }
+
     const windowW = window.innerWidth;
     const windowH = window.innerHeight;
     const newTaskId = `fly_draw_${Date.now()}`;
@@ -548,7 +607,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       ...prev,
       {
         id: newTaskId,
-        from: { x: windowW / 2 + 100, y: windowH / 2 },
+        from: { x: fromX, y: fromY },
         to: { x: windowW / 2, y: windowH - 120 },
         isFaceDown: true
       }
@@ -815,7 +874,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           - Tích hợp đối thủ phân bố vòng cung nhẹ nhàng, tự nhiên
           - Dynamic Scale: Trên mobile, người đến lượt phình to ra để đọc rõ tên; trên PC mở rộng thoải mái
       */}
-      <div className="flex-1 min-h-0 relative flex flex-col justify-between items-center w-full px-2 sm:px-4 py-1 overflow-visible">
+      <div
+        onClick={() => setPopoverOpponentId(null)}
+        className="flex-1 min-h-0 relative flex flex-col justify-between items-center w-full px-2 sm:px-4 py-1 overflow-visible"
+      >
         {/* VÒNG ĐỐI THỦ PHÂN BỐ CUNG TRÒN TỰ CO GIÃN THEO BỀ NGANG MÀN HÌNH (KHÔNG HỘP, KHÔNG CUỘN) */}
         <div className="w-full max-w-5xl flex justify-center items-center gap-1 sm:gap-2 px-1 sm:px-3 pt-1 pb-2 z-20 overflow-visible">
           {opponents.map((opp, idx) => {
@@ -831,20 +893,36 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             const arcRotate = tVal * 6;
 
             // Tự co giãn dynamic:
-            // Trên màn hình nhỏ: Người đến lượt phình to ra (flex-[2.4] min-w-[96px]), người không đến lượt thu gọn (max-w-[48px]).
-            // Trên PC (sm trở lên): Mọi người chơi đều rộng rãi (sm:min-w-[90px] sm:max-w-[145px]) để đọc rõ tên không bao giờ bị cắt.
-            const dynamicSizeClass = isActive
-              ? 'flex-[2.4] xs:flex-[2] sm:flex-1 min-w-[96px] xs:min-w-[110px] sm:min-w-[95px] md:min-w-[115px] max-w-[130px] sm:max-w-[155px] md:max-w-[175px] z-30 scale-105 shadow-2xl'
-              : 'flex-1 min-w-0 max-w-[48px] xs:max-w-[62px] sm:min-w-[85px] md:min-w-[105px] sm:max-w-[135px] md:max-w-[155px]';
+            // Khi ít đối thủ (1-2 người): Rộng rãi min-w-[110px] max-w-[170px] để luôn đọc rõ tên, avatar to, xem được hiệu ứng
+            // Khi vừa (3-4 người): min-w-[75px] max-w-[145px]
+            // Khi đông người (>4 người): Người đến lượt phình to ra (flex-[2.4] min-w-[96px]), người không đến lượt thu gọn (max-w-[48px]).
+            let dynamicSizeClass = '';
+            if (totalOpp <= 2) {
+              dynamicSizeClass = isActive
+                ? 'min-w-[120px] xs:min-w-[135px] max-w-[175px] z-30 scale-105 shadow-2xl'
+                : 'min-w-[105px] xs:min-w-[120px] sm:min-w-[130px] max-w-[160px] sm:max-w-[185px]';
+            } else if (totalOpp <= 4) {
+              dynamicSizeClass = isActive
+                ? 'flex-[2] min-w-[95px] xs:min-w-[110px] max-w-[145px] z-30 scale-105 shadow-xl'
+                : 'flex-1 min-w-[70px] xs:min-w-[80px] max-w-[110px] sm:max-w-[145px]';
+            } else {
+              dynamicSizeClass = isActive
+                ? 'flex-[2.4] xs:flex-[2] sm:flex-1 min-w-[96px] xs:min-w-[110px] sm:min-w-[95px] md:min-w-[115px] max-w-[130px] sm:max-w-[155px] md:max-w-[175px] z-30 scale-105 shadow-2xl'
+                : 'flex-1 min-w-0 max-w-[48px] xs:max-w-[62px] sm:min-w-[85px] md:min-w-[105px] sm:max-w-[135px] md:max-w-[155px]';
+            }
 
             return (
               <div
                 key={opp.id}
                 ref={el => (opponentRefs.current[opp.id] = el)}
+                onClick={e => {
+                  e.stopPropagation();
+                  setPopoverOpponentId(prev => prev === opp.id ? null : opp.id);
+                }}
                 style={{
                   transform: `translateY(${arcY}px) rotate(${arcRotate}deg)`
                 }}
-                className={`${dynamicSizeClass} rounded-xl sm:rounded-2xl flex flex-col items-center justify-between border transition-all duration-300 origin-center py-1 sm:py-2 px-1 sm:px-2 ${
+                className={`${dynamicSizeClass} rounded-xl sm:rounded-2xl flex flex-col items-center justify-between border transition-all duration-300 origin-center py-1 sm:py-2 px-1 sm:px-2 relative cursor-pointer select-none ${
                   isDefusing
                     ? 'ring-4 ring-rose-500 shadow-[0_0_35px_rgba(244,63,94,1)] bg-rose-950 border-rose-400 animate-bounce-short'
                     : isTurn
@@ -944,6 +1022,102 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                     </div>
                   );
                 })}
+
+                {/* POP-OVER DROPDOWN BONG BÓNG CHAT KHI BẤM VÀO AVATAR */}
+                {popoverOpponentId === opp.id && (
+                  <div
+                    onClick={e => e.stopPropagation()}
+                    className="absolute top-[105%] left-1/2 -translate-x-1/2 w-64 sm:w-72 bg-slate-900/98 border-2 border-yellow-400 rounded-2xl p-3 shadow-2xl backdrop-blur-md z-50 text-left cursor-default animate-fade-in"
+                  >
+                    {/* Mũi tên nhọn hướng lên avatar */}
+                    <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[8px] border-b-yellow-400" />
+
+                    <div className="flex items-center justify-between pb-1.5 border-b border-slate-700">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="text-xl flex-shrink-0">{opp.isBot ? '🤖' : '👤'}</span>
+                        <div className="min-w-0">
+                          <div className="font-black text-xs sm:text-sm text-yellow-300 truncate">
+                            {opp.name}
+                          </div>
+                          <div className="text-[9px] text-slate-400">
+                            {opp.isAlive ? (opp.isBot ? (lang === 'en' ? 'AI Bot' : 'Máy AI') : (lang === 'en' ? 'Player' : 'Người chơi')) : (lang === 'en' ? 'Exploded / Dead' : 'Đã nổ tung')}
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={e => {
+                          e.stopPropagation();
+                          setPopoverOpponentId(null);
+                        }}
+                        className="text-slate-400 hover:text-white text-xs p-1 cursor-pointer font-bold rounded-lg hover:bg-slate-800"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    <div className="space-y-2 mt-2 text-[11px] sm:text-xs">
+                      <div className="flex items-center justify-between text-slate-300 bg-slate-800/60 px-2 py-1 rounded-lg">
+                        <span>{lang === 'en' ? 'Cards in hand:' : 'Số bài trên tay:'}</span>
+                        <span className="font-black text-yellow-400 font-mono">
+                          🎴 {opp.hand.length} {lang === 'en' ? 'cards' : 'lá'}
+                        </span>
+                      </div>
+
+                      {/* Danh sách hiệu ứng đang chịu */}
+                      <div className="space-y-1.5 pt-1">
+                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                          {lang === 'en' ? 'Active Status & Effects:' : 'Trạng Thái & Hiệu Ứng:'}
+                        </div>
+
+                        {opp.isBlind && (
+                          <div className="p-2 rounded-xl bg-pink-950/70 border border-pink-500/60 text-pink-200">
+                            <div className="font-black flex items-center gap-1 text-[11px]">
+                              <span>🍑</span> {lang === 'en' ? 'Curse of Cat Butt' : 'Lời Nguyền Mông Mèo'}
+                            </div>
+                            <div className="text-[10px] text-pink-300/80 mt-0.5 leading-snug">
+                              {lang === 'en'
+                                ? 'Blind! All hand cards are face down (🍑) until drawing safely.'
+                                : 'Đang bị mù! Toàn bộ bài trên tay bị úp mù (🍑) cho đến khi bốc bài an toàn.'}
+                            </div>
+                          </div>
+                        )}
+
+                        {opp.hand.filter(c => c.isMarked).map(markedCard => {
+                          const cardDef = CardRegistry.getCard(markedCard.defId);
+                          return (
+                            <div
+                              key={markedCard.uid}
+                              className="p-2 rounded-xl bg-amber-950/70 border border-amber-500/60 text-amber-200"
+                            >
+                              <div className="font-black flex items-center gap-1 text-[11px]">
+                                <span>👁️</span> {lang === 'en' ? 'Revealed Card (Marked):' : 'Lá Bài Bị Lộ (Đánh Dấu):'}
+                              </div>
+                              <div className="mt-1 flex items-center gap-1.5 bg-slate-900/90 p-1.5 rounded-lg border border-amber-400/40">
+                                <span className="text-xl">{cardDef?.icon}</span>
+                                <div>
+                                  <div className="font-black text-amber-300 text-xs">
+                                    {lang === 'en' ? cardDef?.nameEn : cardDef?.nameVi}
+                                  </div>
+                                  <div className="text-[9.5px] text-slate-300 line-clamp-2 leading-tight mt-0.5">
+                                    {cardDef?.description}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                        {!opp.isBlind && opp.hand.filter(c => c.isMarked).length === 0 && (
+                          <div className="text-[10.5px] text-emerald-400/90 bg-emerald-950/30 border border-emerald-500/30 rounded-lg p-1.5 flex items-center gap-1.5">
+                            <span>✓</span>
+                            <span>{lang === 'en' ? 'Normal (No negative effects)' : 'Bình thường (Không có hiệu ứng bất lợi)'}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -963,7 +1137,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             />
 
             {/* B. BÊN PHẢI: TRỒNG BÀI BỐC (DRAW PILE) */}
-            <div className="flex flex-col items-center justify-start flex-shrink-0">
+            <div ref={drawPileRef} className="flex flex-col items-center justify-start flex-shrink-0">
               {/* Trên xấp bài bốc: Header cao cố định h-10 sm:h-11 cân bằng hoàn hảo với bên Trồng Bài Bỏ */}
               <div className="h-10 sm:h-11 mb-2 text-center flex flex-col items-center justify-end">
                 <span className="h-4 text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-300 block mb-0.5 leading-none whitespace-nowrap">
@@ -1049,15 +1223,15 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                   )}
                 </div>
               ) : (
-                /* THẺ BÀI TRỒNG RÚT BÌNH THƯỜNG */
+                /* THẺ BÀI TRỒNG RÚT BÌNH THƯỜNG - MẶT SAU THỐNG NHẤT GRADIENT ĐỎ ĐEN, KHÔNG ICON BOM */
                 <div
                   onClick={handleDrawCard}
-                  className={`relative w-[116px] h-[180px] sm:w-[136px] sm:h-[212px] md:w-[148px] md:h-[228px] rounded-2xl border-2 sm:border-3 flex flex-col items-center justify-between p-2.5 sm:p-3 card-shadow transition-all ${
+                  className={`relative w-[116px] h-[180px] sm:w-[136px] sm:h-[212px] md:w-[148px] md:h-[228px] rounded-2xl border-2 sm:border-3 flex flex-col items-center justify-between p-2.5 sm:p-3 card-shadow select-none transition-all overflow-hidden ${
                     isShufflingDrawPile
                       ? 'animate-shuffle-cards border-indigo-400 shadow-[0_0_35px_rgba(99,102,241,0.7)]'
                       : isMyTurn && !state.pendingAction
-                      ? 'cursor-pointer hover:scale-105 ring-4 ring-yellow-400 border-yellow-400 bg-gradient-to-b from-rose-900 via-rose-950 to-slate-950 animate-pulse'
-                      : 'cursor-not-allowed border-slate-700 bg-gradient-to-b from-slate-800 to-slate-950 opacity-95'
+                      ? 'cursor-pointer hover:scale-105 ring-4 ring-yellow-400 border-yellow-400 bg-gradient-to-br from-rose-950 via-red-950 to-slate-950 shadow-[0_0_25px_rgba(234,179,8,0.5)] animate-pulse'
+                      : 'cursor-not-allowed border-rose-600/80 bg-gradient-to-br from-rose-950 via-red-950 to-slate-950 opacity-95 shadow-xl'
                   }`}
                 >
                   {/* Khi đang xào bài: Hiện 2 lớp lá bài phụ bay lệch sang 2 bên và huy hiệu xào bài */}
@@ -1074,18 +1248,21 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                     </>
                   )}
 
-                  <div className="w-full flex justify-between text-rose-500 font-black text-[10px]">
-                    <span>💣</span>
-                    <span>{lang === 'en' ? 'EXPLODING' : 'MÈO NỔ'}</span>
+                  {/* 4 góc EK đối xứng */}
+                  <div className="w-full flex justify-between text-rose-400/80 font-black text-[8px] sm:text-[9px] font-mono">
+                    <span>EK</span>
+                    <span>EK</span>
                   </div>
 
-                  <div className="text-center my-auto">
-                    <div className="text-4xl sm:text-5xl mb-0.5 drop-shadow-xl">
-                      💣
+                  {/* Trung tâm: Dòng chữ MÈO NỔ vàng rực trên nền gradient đỏ đen, không icon bom */}
+                  <div className="text-center my-auto flex flex-col items-center justify-center">
+                    <div className="text-xl sm:text-2xl md:text-3xl font-black text-yellow-400 tracking-wider drop-shadow-[0_2px_12px_rgba(234,179,8,0.7)] uppercase">
+                      MÈO NỔ
                     </div>
-                    <p className="text-[10px] font-black text-rose-300 uppercase tracking-widest">
-                      EXPLODING
+                    <p className="text-[7.5px] sm:text-[9px] font-bold text-rose-300/90 uppercase tracking-widest mt-0.5">
+                      EXPLODING KITTENS
                     </p>
+                    <div className="mt-1.5 w-10 sm:w-14 h-0.5 bg-gradient-to-r from-transparent via-yellow-400/60 to-transparent" />
                   </div>
 
                   {isMyTurn && !state.pendingAction ? (
@@ -1096,7 +1273,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                       {lang === 'en' ? 'DRAW (End Turn)' : 'RÚT BÀI (Hết Lượt)'}
                     </button>
                   ) : (
-                    <span className="text-[9px] text-slate-500 uppercase font-semibold">
+                    <span className="text-[9px] text-slate-400 uppercase font-semibold">
                       {isMyTurn ? (lang === 'en' ? 'Resolving...' : 'Đang giải quyết') : (lang === 'en' ? 'Waiting turn' : 'Chờ tới lượt')}
                     </span>
                   )}
